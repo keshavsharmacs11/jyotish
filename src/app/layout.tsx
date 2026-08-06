@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
 import Navbar from "@/components/layout/Navbar";
+import ScrollToTop from "@/components/utils/ScrollToTop";
 import "./globals.css";
 
 const headingFont = Cormorant_Garamond({
@@ -29,9 +30,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${headingFont.variable} ${bodyFont.variable}`}>
-        <Navbar />
-        {children}
-      </body>
+       <ScrollToTop />
+       {children}
+    </body>
     </html>
   );
 }
