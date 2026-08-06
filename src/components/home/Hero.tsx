@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Button from "@/components/ui/Button";
+import Floating from "@/components/ui/Floating";
 import { siteContent } from "@/data/site";
 
 export default function Hero() {
@@ -71,18 +72,20 @@ export default function Hero() {
             ✦
           </div>
 
-          <div className="hero-image-wrapper">
+          <Floating>
+  <div className="hero-image-wrapper">
 
-            <Image
-              src="/images/consultants/consultants.png"
-              alt="Consultant"
-              width={650}
-              height={700}
-              priority
-              className="hero-image"
-            />
+    <Image
+      src="/images/consultants/consultants.png"
+      alt="Consultant"
+      width={650}
+      height={700}
+      priority
+      className="hero-image"
+    />
 
-          </div>
+  </div>
+</Floating>
 
           <div className="consultant-label">
 
