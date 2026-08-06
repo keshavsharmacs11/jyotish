@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import Button from "@/components/ui/Button";
 import { siteContent } from "@/data/site";
 
 export default function Hero() {
@@ -29,15 +29,18 @@ export default function Hero() {
 
           <div className="hero-actions">
 
-            <Link href="/book" className="btn btn-primary">
-             {hero.primaryButton}
-            </Link>
+  <Button href="/book">
+    {hero.primaryButton}
+  </Button>
 
-            <Link href="/services" className="btn hero-secondary">
-              {hero.secondaryButton}
-            </Link>
+  <Button
+    href="/services"
+    variant="secondary"
+  >
+    {hero.secondaryButton}
+  </Button>
 
-          </div>
+</div>
 
           <div className="hero-trust">
 

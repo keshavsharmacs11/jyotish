@@ -30,9 +30,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${headingFont.variable} ${bodyFont.variable}`}>
-       <ScrollToTop />
-       {children}
-    </body>
+        <ScrollToTop />
+        <Navbar />
+        {children}
+      </body>
     </html>
   );
 }
