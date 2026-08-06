@@ -1,40 +1,43 @@
 import { siteContent } from "@/data/site";
+import FadeIn from "@/components/ui/FadeIn";
 
 export default function Services() {
   const { services } = siteContent;
 
   return (
-    <section className="section">
-      <div className="site-container">
+    <FadeIn>
+      <section className="section">
+        <div className="site-container">
 
-        <p className="eyebrow">
-          {services.eyebrow}
-        </p>
+          <p className="eyebrow">
+            {services.eyebrow}
+          </p>
 
-        <h2 className="section-heading">
-          {services.title}
-        </h2>
+          <h2 className="section-heading">
+            {services.title}
+          </h2>
 
-        <div className="services-grid">
+          <div className="services-grid">
 
-          {services.items.map((service) => (
-            <div
-              key={service.title}
-              className="service-card"
-            >
-              <h3>{service.title}</h3>
+            {services.items.map((service) => (
+              <div
+                key={service.title}
+                className="service-card"
+              >
+                <h3>{service.title}</h3>
 
-              <p>{service.description}</p>
+                <p>{service.description}</p>
 
-              <button className="btn btn-primary">
-                Learn More
-              </button>
-            </div>
-          ))}
+                <button className="btn btn-primary">
+                  Learn More
+                </button>
+              </div>
+            ))}
+
+          </div>
 
         </div>
-
-      </div>
-    </section>
+      </section>
+    </FadeIn>
   );
 }

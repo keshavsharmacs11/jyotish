@@ -1,3 +1,5 @@
+import FadeIn from "@/components/ui/FadeIn";
+
 export default function Process() {
   const steps = [
     {
@@ -27,28 +29,30 @@ export default function Process() {
   ];
 
   return (
-    <section className="section">
-      <div className="site-container">
-        <p className="eyebrow">HOW IT WORKS</p>
+    <FadeIn>
+      <section className="section">
+        <div className="site-container">
+          <p className="eyebrow">HOW IT WORKS</p>
 
-        <h2 className="section-heading">
-          Book Your Consultation in Four Simple Steps
-        </h2>
+          <h2 className="section-heading">
+            Book Your Consultation in Four Simple Steps
+          </h2>
 
-        <div className="process-grid">
-          {steps.map((step) => (
-            <div key={step.number} className="process-card">
-              <div className="process-number">
-                {step.number}
+          <div className="process-grid">
+            {steps.map((step) => (
+              <div key={step.number} className="process-card">
+                <div className="process-number">
+                  {step.number}
+                </div>
+
+                <h3>{step.title}</h3>
+
+                <p>{step.description}</p>
               </div>
-
-              <h3>{step.title}</h3>
-
-              <p>{step.description}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </FadeIn>
   );
 }

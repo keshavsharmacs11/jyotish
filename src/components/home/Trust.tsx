@@ -1,35 +1,38 @@
 import { siteContent } from "@/data/site";
+import FadeIn from "@/components/ui/FadeIn";
 
 export default function Trust() {
   const { trust } = siteContent;
 
   return (
-    <section className="section">
-      <div className="site-container">
+    <FadeIn>
+      <section className="section">
+        <div className="site-container">
 
-        <p className="eyebrow">
-          TRUST
-        </p>
+          <p className="eyebrow">
+            TRUST
+          </p>
 
-        <h2 className="section-heading">
-          {trust.title}
-        </h2>
+          <h2 className="section-heading">
+            {trust.title}
+          </h2>
 
-        <div className="trust-grid">
+          <div className="trust-grid">
 
-          {trust.items.map((item) => (
-            <div key={item.title} className="trust-card">
+            {trust.items.map((item) => (
+              <div key={item.title} className="trust-card">
 
-              <h3>{item.title}</h3>
+                <h3>{item.title}</h3>
 
-              <p>{item.description}</p>
+                <p>{item.description}</p>
 
-            </div>
-          ))}
+              </div>
+            ))}
+
+          </div>
 
         </div>
-
-      </div>
-    </section>
+      </section>
+    </FadeIn>
   );
 }
