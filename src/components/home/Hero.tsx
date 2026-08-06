@@ -2,6 +2,7 @@ import Image from "next/image";
 import Button from "@/components/ui/Button";
 import Floating from "@/components/ui/Floating";
 import SlideLeft from "@/components/ui/SlideLeft";
+import SlideRight from "@/components/ui/SlideRight";
 import { siteContent } from "@/data/site";
 
 export default function Hero() {
@@ -68,40 +69,42 @@ export default function Hero() {
         </SlideLeft>
 
         {/* RIGHT */}
-        <div className="hero-visual">
+        <SlideRight>
+          <div className="hero-visual">
 
-          <div className="hero-zodiac">
-            ✦
-          </div>
+            <div className="hero-zodiac">
+              ✦
+            </div>
 
-          <Floating>
-            <div className="hero-image-wrapper">
+            <Floating>
+              <div className="hero-image-wrapper">
 
-              <Image
-                src="/images/consultants/consultants.png"
-                alt="Consultant"
-                width={650}
-                height={700}
-                priority
-                className="hero-image"
-              />
+                <Image
+                  src="/images/consultants/consultants.png"
+                  alt="Consultant"
+                  width={650}
+                  height={700}
+                  priority
+                  className="hero-image"
+                />
+
+              </div>
+            </Floating>
+
+            <div className="consultant-label">
+
+              <strong>
+                Personal Consultation
+              </strong>
+
+              <span>
+                Astrology • Numerology • Tarot
+              </span>
 
             </div>
-          </Floating>
-
-          <div className="consultant-label">
-
-            <strong>
-              Personal Consultation
-            </strong>
-
-            <span>
-              Astrology • Numerology • Tarot
-            </span>
 
           </div>
-
-        </div>
+        </SlideRight>
 
       </div>
     </section>
