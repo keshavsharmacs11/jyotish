@@ -1,10 +1,12 @@
 import Image from "next/image";
 import Button from "@/components/ui/Button";
 import Floating from "@/components/ui/Floating";
+import SlideLeft from "@/components/ui/SlideLeft";
 import { siteContent } from "@/data/site";
 
 export default function Hero() {
-    const { hero } = siteContent;
+  const { hero } = siteContent;
+
   return (
     <section className="hero">
       <div className="hero-orbit hero-orbit-one" />
@@ -13,59 +15,59 @@ export default function Hero() {
       <div className="site-container hero-grid">
 
         {/* LEFT */}
+        <SlideLeft>
+          <div className="hero-content">
 
-        <div className="hero-content">
+            <p className="eyebrow hero-eyebrow">
+              {hero.eyebrow}
+            </p>
 
-          <p className="eyebrow hero-eyebrow">
-           {hero.eyebrow}
-          </p>
+            <h1 className="display-heading hero-title">
+              {hero.title}
+            </h1>
 
-          <h1 className="display-heading hero-title">
-            {hero.title}
-          </h1>
+            <p className="hero-description">
+              {hero.description}
+            </p>
 
-          <p className="hero-description">
-            {hero.description}
-          </p>
+            <div className="hero-actions">
 
-          <div className="hero-actions">
+              <Button href="/book">
+                {hero.primaryButton}
+              </Button>
 
-  <Button href="/book">
-    {hero.primaryButton}
-  </Button>
+              <Button
+                href="/services"
+                variant="secondary"
+              >
+                {hero.secondaryButton}
+              </Button>
 
-  <Button
-    href="/services"
-    variant="secondary"
-  >
-    {hero.secondaryButton}
-  </Button>
-
-</div>
-
-          <div className="hero-trust">
-
-            <div>
-              <strong>Personal Guidance</strong>
-              <span>One-to-One Sessions</span>
             </div>
 
-            <div>
-              <strong>Confidential</strong>
-              <span>Private Consultation</span>
-            </div>
+            <div className="hero-trust">
 
-            <div>
-              <strong>Online</strong>
-              <span>Anywhere in India</span>
+              <div>
+                <strong>Personal Guidance</strong>
+                <span>One-to-One Sessions</span>
+              </div>
+
+              <div>
+                <strong>Confidential</strong>
+                <span>Private Consultation</span>
+              </div>
+
+              <div>
+                <strong>Online</strong>
+                <span>Anywhere in India</span>
+              </div>
+
             </div>
 
           </div>
-
-        </div>
+        </SlideLeft>
 
         {/* RIGHT */}
-
         <div className="hero-visual">
 
           <div className="hero-zodiac">
@@ -73,19 +75,19 @@ export default function Hero() {
           </div>
 
           <Floating>
-  <div className="hero-image-wrapper">
+            <div className="hero-image-wrapper">
 
-    <Image
-      src="/images/consultants/consultants.png"
-      alt="Consultant"
-      width={650}
-      height={700}
-      priority
-      className="hero-image"
-    />
+              <Image
+                src="/images/consultants/consultants.png"
+                alt="Consultant"
+                width={650}
+                height={700}
+                priority
+                className="hero-image"
+              />
 
-  </div>
-</Floating>
+            </div>
+          </Floating>
 
           <div className="consultant-label">
 
