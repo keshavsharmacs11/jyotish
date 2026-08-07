@@ -1104,3 +1104,74 @@ width:100%;
 }
 
 }
+/* ============================================
+   FAQ
+============================================ */
+
+.faq-list{
+
+margin-top:50px;
+
+display:flex;
+
+flex-direction:column;
+
+gap:18px;
+
+}
+
+.faq-item{
+
+background:#fff;
+
+border:1px solid var(--color-border);
+
+border-radius:18px;
+
+overflow:hidden;
+
+box-shadow:var(--shadow-soft);
+
+}
+
+.faq-question{
+
+width:100%;
+
+display:flex;
+
+justify-content:space-between;
+
+align-items:center;
+
+padding:24px;
+
+background:none;
+
+border:none;
+
+font-size:1rem;
+
+font-weight:600;
+
+cursor:pointer;
+
+}
+
+.faq-question span{
+
+font-size:1.6rem;
+
+color:var(--color-gold);
+
+}
+
+.faq-answer{
+
+padding:0 24px 24px;
+
+color:var(--color-muted);
+
+line-height:1.8;
+
+}
