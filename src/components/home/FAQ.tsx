@@ -2,77 +2,75 @@
 
 import { useState } from "react";
 
-const faqs = [
+const faqData = [
   {
     question: "How do I book a consultation?",
     answer:
-      "Simply click on Book Consultation, choose your preferred service, date and time, then confirm your booking.",
+      "Click on the Book Consultation button, select your preferred service, choose an available date and time, and confirm your booking.",
   },
   {
     question: "Are online consultations available?",
     answer:
-      "Yes. Consultations are conducted online through Google Meet or your preferred platform.",
+      "Yes. All consultations are available online through Google Meet or your preferred communication platform.",
   },
   {
     question: "Which services do you provide?",
     answer:
-      "We provide Vedic Astrology, Numerology and Tarot consultations for career, marriage, business and personal guidance.",
+      "We provide Vedic Astrology, Numerology, Tarot Reading, Career Guidance, Marriage Consultation and Business Consultation.",
   },
   {
-    question: "How long does one consultation last?",
+    question: "How long is one consultation?",
     answer:
       "Most consultations last between 30 and 60 minutes depending on the selected service.",
+  },
+  {
+    question: "Can I reschedule my booking?",
+    answer:
+      "Yes. You can request a reschedule before your appointment time by contacting our support.",
   },
 ];
 
 export default function FAQ() {
-  const [open, setOpen] = useState<number | null>(0);
+  const [activeIndex, setActiveIndex] = useState<number | null>(0);
+
+  const toggle = (index: number) => {
+    setActiveIndex(activeIndex === index ? null : index);
+  };
 
   return (
     <section className="section">
       <div className="site-container">
 
-        <p className="eyebrow">
-          FAQ
-        </p>
+        <p className="eyebrow">FAQ</p>
 
         <h2 className="section-heading">
           Frequently Asked Questions
         </h2>
 
-        <div className="faq-list">
-
-          {faqs.map((faq, index) => (
-
-            <div
-              key={faq.question}
-              className="faq-item"
-            >
+        <div className="faq-container">
+          {faqData.map((faq, index) => (
+            <div key={faq.question} className="faq-card">
 
               <button
                 className="faq-question"
-                onClick={() =>
-                  setOpen(open === index ? null : index)
-                }
+                onClick={() => toggle(index)}
               >
-                {faq.question}
+                <span>{faq.question}</span>
 
-                <span>
-                  {open === index ? "−" : "+"}
+                <span className="faq-icon">
+                  {activeIndex === index ? "−" : "+"}
                 </span>
 
               </button>
 
-              {open === index && (
-                <p className="faq-answer">
-                  {faq.answer}
-                </p>
+              {activeIndex === index && (
+                <div className="faq-answer">
+                  <p>{faq.answer}</p>
+                </div>
               )}
 
             </div>
-
           ))}
-
         </div>
 
       </div>

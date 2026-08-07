@@ -1108,73 +1108,52 @@ width:100%;
    FAQ
 ============================================ */
 
-.faq-list{
-
+.faq-container{
 margin-top:50px;
-
 display:flex;
-
 flex-direction:column;
-
 gap:18px;
-
 }
 
-.faq-item{
-
+.faq-card{
 background:#fff;
-
 border:1px solid var(--color-border);
-
 border-radius:18px;
-
 overflow:hidden;
-
 box-shadow:var(--shadow-soft);
+transition:.3s ease;
+}
 
+.faq-card:hover{
+border-color:var(--color-gold-light);
 }
 
 .faq-question{
-
 width:100%;
-
+padding:24px 28px;
 display:flex;
-
 justify-content:space-between;
-
 align-items:center;
-
-padding:24px;
-
 background:none;
-
 border:none;
-
 font-size:1rem;
-
 font-weight:600;
-
 cursor:pointer;
-
+text-align:left;
 }
 
-.faq-question span{
-
-font-size:1.6rem;
-
+.faq-icon{
+font-size:28px;
 color:var(--color-gold);
-
+font-weight:700;
 }
 
 .faq-answer{
-
-padding:0 24px 24px;
-
+padding:0 28px 24px;
 color:var(--color-muted);
-
 line-height:1.8;
-
 }
+
 /* ============================================
    TESTIMONIALS
 ============================================ */
