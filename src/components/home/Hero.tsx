@@ -76,6 +76,29 @@ export default function Hero() {
               ✦
             </div>
 
+            <div className="cosmic-card">
+
+            <span className="cosmic-icon">✦</span>
+
+            <h4>Cosmic Insight</h4>
+
+            <div className="cosmic-item">
+              <small>Lucky Number</small>
+              <strong>7</strong>
+            </div>
+
+            <div className="cosmic-item">
+              <small>Lucky Colour</small>
+              <strong>Golden</strong>
+            </div>
+
+            <div className="cosmic-item">
+              <small>Positive Energy</small>
+              <strong>★★★★☆</strong>
+            </div>
+
+          </div>
+
             <Floating>
               <div className="hero-image-wrapper">
 
