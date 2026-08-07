@@ -79,14 +79,14 @@ export default function Hero() {
             <Floating>
               <div className="hero-image-wrapper">
 
-                <Image
-                  src="/images/consultants/consultants.png"
-                  alt="Consultant"
-                  width={650}
-                  height={700}
-                  priority
-                  className="hero-image"
-                />
+             <Image
+              src="/images/consultants/main.jpg"
+              alt="Deepak Ji and Shweta Ji"
+              width={900}
+              height={900}
+              priority
+              className="hero-image"
+            />
 
               </div>
             </Floating>

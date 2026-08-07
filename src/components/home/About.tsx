@@ -1,5 +1,6 @@
 import Image from "next/image";
 import FadeIn from "@/components/ui/FadeIn";
+import Button from "@/components/ui/Button";
 import { siteContent } from "@/data/site";
 
 export default function About() {
@@ -23,16 +24,19 @@ export default function About() {
           </p>
 
           <div className="about-grid">
+
             {about.consultants.map((consultant) => (
+
               <div
                 key={consultant.name}
                 className="about-card"
               >
+
                 <Image
                   src={consultant.image}
                   alt={consultant.name}
-                  width={300}
-                  height={350}
+                  width={350}
+                  height={420}
                   className="about-image"
                 />
 
@@ -40,11 +44,16 @@ export default function About() {
 
                 <p>{consultant.role}</p>
 
-                <button className="btn btn-primary">
+                <div style={{ marginTop: "auto" }}>
+                <Button href="/book">
                   Book Consultation
-                </button>
+                </Button>
+                </div>
+
               </div>
+
             ))}
+
           </div>
 
         </div>

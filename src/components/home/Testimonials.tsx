@@ -1,30 +1,25 @@
-import Image from "next/image";
-
-const testimonials = [
-  {
-    name: "Priya Sharma",
-    location: "Delhi",
-    image: "/images/testimonials/user1.jpg",
-    review:
-      "The consultation gave me clarity regarding my career and future decisions. Everything was explained with patience and confidence.",
-  },
-  {
-    name: "Rahul Verma",
-    location: "Lucknow",
-    image: "/images/testimonials/user2.jpg",
-    review:
-      "Very genuine guidance. The predictions were practical and the remedies were simple to follow. Highly recommended.",
-  },
-  {
-    name: "Neha Gupta",
-    location: "Jaipur",
-    image: "/images/testimonials/user3.jpg",
-    review:
-      "The numerology consultation helped me understand myself better. It was a wonderful experience from start to finish.",
-  },
-];
-
 export default function Testimonials() {
+  const testimonials = [
+    {
+      name: "Priya Sharma",
+      location: "Delhi",
+      review:
+        "The consultation gave me clarity regarding my career and future decisions. Everything was explained with patience and confidence.",
+    },
+    {
+      name: "Rahul Verma",
+      location: "Lucknow",
+      review:
+        "Very genuine guidance. The predictions were practical and the remedies were simple to follow. Highly recommended.",
+    },
+    {
+      name: "Neha Gupta",
+      location: "Jaipur",
+      review:
+        "The numerology consultation helped me understand myself better. It was a wonderful experience from start to finish.",
+    },
+  ];
+
   return (
     <section className="section">
       <div className="site-container">
@@ -46,13 +41,9 @@ export default function Testimonials() {
               className="testimonial-card"
             >
 
-              <Image
-                src={item.image}
-                alt={item.name}
-                width={70}
-                height={70}
-                className="testimonial-image"
-              />
+              <div className="testimonial-rating">
+                ★★★★★
+              </div>
 
               <p className="testimonial-review">
                 "{item.review}"
