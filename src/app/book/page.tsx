@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import PageHero from "@/components/shared/PageHero";
 import Footer from "@/components/layout/Footer";
-import ServiceSelector from "@/components/booking/ServiceSelector";
+import ServiceSelector from "@/components/booking/serviceselector";
 import ConsultationModeSelector from "@/components/booking/ConsultationModeSelector";
 import { BookingMode } from "@/types/booking";
 import { services } from "@/data/services";
