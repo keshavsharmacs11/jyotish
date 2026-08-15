@@ -1,8 +1,71 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 import PageHero from "@/components/shared/PageHero";
 import Footer from "@/components/layout/Footer";
-import Image from "next/image";
+
+type Consultant = {
+  _id: string;
+  name: string;
+  photo?: string;
+  specialization: string;
+  availableModes: ("video" | "voice")[];
+};
 
 export default function ConsultantsPage() {
+  const [consultants, setConsultants] = useState<Consultant[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadConsultants() {
+      try {
+        const response = await fetch(
+          "/api/consultants",
+          {
+            cache: "no-store",
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(
+            data.error ||
+              "Unable to load consultants."
+          );
+        }
+
+        if (mounted) {
+          setConsultants(
+            data.consultants || []
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Consultants page error:",
+          error
+        );
+
+        if (mounted) {
+          setConsultants([]);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadConsultants();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <>
       <PageHero
@@ -14,47 +77,70 @@ export default function ConsultantsPage() {
       <section className="section">
         <div className="site-container">
 
-          <div className="about-grid">
+          {loading ? (
+            <div className="consultants-loading">
+              <p>Loading consultants...</p>
+            </div>
+          ) : (
+            <div className="about-grid">
 
-            <div className="about-card">
+              {consultants.map(
+                (consultant) => (
+                  <div
+                    key={consultant._id}
+                    className="about-card"
+                  >
 
-              <Image
-                src="/images/consultants/deepak.jpg"
-                alt="Deepak Ji"
-                width={500}
-                height={600}
-                className="about-image"
-              />
+                    {consultant.photo ? (
+                      <img
+                        src={consultant.photo}
+                        alt={consultant.name}
+                        className="about-image"
+                      />
+                    ) : (
+                      <div className="consultant-photo-placeholder">
+                        <span>
+                          {consultant.name
+                            .charAt(0)
+                            .toUpperCase()}
+                        </span>
+                      </div>
+                    )}
 
-              <h3>Deepak Ji</h3>
+                    <h3>
+                      {consultant.name}
+                    </h3>
 
-              <p>
-                Vedic Astrology, Career Guidance,
-                Business Consultation
-              </p>
+                    <p>
+                      {consultant.specialization}
+                    </p>
+
+                    <div className="consultant-modes">
+
+                      {consultant.availableModes.includes(
+                        "video"
+                      ) && (
+                        <span>
+                          • Video
+                        </span>
+                      )}
+
+                      {consultant.availableModes.includes(
+                        "voice"
+                      ) && (
+                        <span>
+                          • Voice
+                        </span>
+                      )}
+
+                    </div>
+
+                  </div>
+                )
+              )}
 
             </div>
-
-            <div className="about-card">
-
-              <Image
-                src="/images/consultants/shweta.jpg"
-                alt="Shweta Ji"
-                width={500}
-                height={600}
-                className="about-image"
-              />
-
-              <h3>Shweta Ji</h3>
-
-              <p>
-                Numerology, Tarot Reading,
-                Relationship Guidance
-              </p>
-
-            </div>
-
-          </div>
+          )}
 
         </div>
       </section>

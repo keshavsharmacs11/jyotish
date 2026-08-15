@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Manrope } from "next/font/google";
-import Navbar from "@/components/layout/Navbar";
+import {
+  Cormorant_Garamond,
+  Manrope,
+} from "next/font/google";
+
 import ScrollToTop from "@/components/utils/ScrollToTop";
+import SiteChrome from "@/components/layout/SiteChrome";
+
 import "./globals.css";
 
 const headingFont = Cormorant_Garamond({
@@ -17,7 +22,9 @@ const bodyFont = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Akshaanshh Jyotish | Astrology Consultation",
+  title:
+    "Akshaanshh Jyotish | Astrology Consultation",
+
   description:
     "Personalized astrology, numerology and tarot consultations for clarity in life, career and relationships.",
 };
@@ -29,10 +36,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${headingFont.variable} ${bodyFont.variable}`}>
+      <body
+        className={`${headingFont.variable} ${bodyFont.variable}`}
+      >
         <ScrollToTop />
-        <Navbar />
-        {children}
+
+        <SiteChrome>
+          {children}
+        </SiteChrome>
       </body>
     </html>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Script from "next/script";
 
 import PageHero from "@/components/shared/PageHero";
@@ -22,19 +22,7 @@ import {
   Service,
 } from "@/types/booking";
 
-type ConsultantAvailability = {
-  date: string;
-  times: string[];
-};
-
-type Consultant = {
-  _id: string;
-  name: string;
-  specialization: string;
-  availableModes: ("video" | "voice")[];
-  availability: ConsultantAvailability[];
-  active: boolean;
-};
+import { availability } from "@/data/availability";
 
 const initialCustomerData: CustomerFormData = {
   fullName: "",
@@ -67,36 +55,14 @@ export default function BookPage() {
    * ============================================
    */
 
-  const [services, setServices] =
-    useState<Service[]>([]);
+  const [services, setServices] = useState<Service[]>(
+    []
+  );
 
   const [servicesLoading, setServicesLoading] =
     useState(true);
 
   const [servicesError, setServicesError] =
-    useState<string | null>(null);
-
-  /*
-   * ============================================
-   * CONSULTANTS FROM MONGODB
-   * ============================================
-   */
-
-  const [consultants, setConsultants] =
-    useState<Consultant[]>([]);
-
-  const [consultantsLoading, setConsultantsLoading] =
-    useState(false);
-
-  const [consultantsError, setConsultantsError] =
-    useState<string | null>(null);
-
-  /*
-   * The consultant is selected automatically
-   * according to the selected date + time.
-   */
-
-  const [selectedConsultantId, setSelectedConsultantId] =
     useState<string | null>(null);
 
   /*
@@ -138,6 +104,16 @@ export default function BookPage() {
    * ============================================
    * DATABASE BOOKING INFORMATION
    * ============================================
+   *
+   * These values now come from MongoDB.
+   *
+   * bookingMongoId:
+   * MongoDB's internal _id.
+   *
+   * bookingId:
+   * Customer-facing ID such as:
+   *
+   * AKJ-2026-781971
    */
 
   const [bookingMongoId, setBookingMongoId] =
@@ -147,67 +123,12 @@ export default function BookPage() {
     useState<string | null>(null);
 
   /*
-   * Prevent duplicate booking creation.
+   * Prevent duplicate booking creation while
+   * the request is running.
    */
 
   const [creatingBooking, setCreatingBooking] =
     useState(false);
-
-  /*
-   * ============================================
-   * LOAD CONSULTANTS FROM MONGODB
-   * ============================================
-   */
-
-  const loadConsultants = async () => {
-    try {
-      setConsultantsLoading(true);
-      setConsultantsError(null);
-
-      const response = await fetch(
-        "/api/consultants",
-        {
-          method: "GET",
-          cache: "no-store",
-        }
-      );
-
-      const data =
-        await response.json();
-
-      if (
-        !response.ok ||
-        !data.success
-      ) {
-        throw new Error(
-          data.error ||
-            "Unable to load consultants."
-        );
-      }
-
-      setConsultants(
-        data.consultants || []
-      );
-
-      console.log(
-        "Consultants loaded from MongoDB:",
-        data.consultants || []
-      );
-    } catch (error) {
-      console.error(
-        "CONSULTANT LOADING ERROR:",
-        error
-      );
-
-      setConsultantsError(
-        error instanceof Error
-          ? error.message
-          : "Unable to load consultants."
-      );
-    } finally {
-      setConsultantsLoading(false);
-    }
-  };
 
   /*
    * ============================================
@@ -229,13 +150,9 @@ export default function BookPage() {
           }
         );
 
-        const data =
-          await response.json();
+        const data = await response.json();
 
-        if (
-          !response.ok ||
-          !data.success
-        ) {
+        if (!response.ok || !data.success) {
           throw new Error(
             data.error ||
               "Unable to load services."
@@ -298,16 +215,6 @@ export default function BookPage() {
 
   /*
    * ============================================
-   * LOAD CONSULTANTS ON PAGE LOAD
-   * ============================================
-   */
-
-  useEffect(() => {
-    loadConsultants();
-  }, []);
-
-  /*
-   * ============================================
    * SELECTED SERVICE
    * ============================================
    */
@@ -319,182 +226,6 @@ export default function BookPage() {
 
   /*
    * ============================================
-   * AVAILABLE CONSULTANTS
-   * ============================================
-   *
-   * Consultant must:
-   *
-   * 1. Be active
-   * 2. Support selected mode
-   * 3. Belong to selected service if
-   *    service consultantIds are configured
-   */
-
-  const availableConsultants =
-    consultants.filter(
-      (consultant) => {
-        if (!consultant.active) {
-          return false;
-        }
-
-        if (
-          selectedMode &&
-          !consultant.availableModes.includes(
-            selectedMode
-          )
-        ) {
-          return false;
-        }
-
-        if (
-          selectedService &&
-          selectedService.consultantIds &&
-          selectedService.consultantIds.length > 0
-        ) {
-          return selectedService.consultantIds.includes(
-            consultant._id
-          );
-        }
-
-        return true;
-      }
-    );
-
-  /*
-   * ============================================
-   * COMBINED CONSULTANT AVAILABILITY
-   * ============================================
-   *
-   * This gives DateTimeSelector a neutral
-   * list of dates/times.
-   *
-   * The customer does NOT choose a consultant.
-   *
-   * The system assigns one after a time is
-   * selected.
-   */
-
-  const combinedAvailability =
-    useMemo<ConsultantAvailability[]>(
-      () => {
-        const availabilityMap =
-          new Map<string, Set<string>>();
-
-        for (
-          const consultant of availableConsultants
-        ) {
-          for (
-            const item of
-              consultant.availability ?? []
-          ) {
-            if (!item?.date) {
-              continue;
-            }
-
-            if (
-              !availabilityMap.has(
-                item.date
-              )
-            ) {
-              availabilityMap.set(
-                item.date,
-                new Set<string>()
-              );
-            }
-
-            const times =
-              availabilityMap.get(
-                item.date
-              )!;
-
-            for (
-              const time of
-                item.times ?? []
-            ) {
-              if (time) {
-                times.add(
-                  String(time)
-                );
-              }
-            }
-          }
-        }
-
-        return Array.from(
-          availabilityMap.entries()
-        )
-          .map(
-            ([date, times]) => ({
-              date,
-              times:
-                Array.from(times).sort(),
-            })
-          )
-          .filter(
-            (item) =>
-              item.times.length > 0
-          )
-          .sort(
-            (a, b) =>
-              a.date.localeCompare(
-                b.date
-              )
-          );
-      },
-      [consultants, selectedMode, selectedServiceId]
-    );
-
-  /*
-   * ============================================
-   * FIND CONSULTANT FOR EXACT SLOT
-   * ============================================
-   */
-
-  const findConsultantForSlot = (
-    date: string,
-    time: string
-  ): Consultant | null => {
-    const matchingConsultant =
-      availableConsultants.find(
-        (consultant) => {
-          const dateAvailability =
-            consultant.availability?.find(
-              (item) =>
-                item.date === date
-            );
-
-          if (!dateAvailability) {
-            return false;
-          }
-
-          return (
-            dateAvailability.times?.includes(
-              time
-            ) ?? false
-          );
-        }
-      );
-
-    return matchingConsultant ?? null;
-  };
-
-  /*
-   * ============================================
-   * SELECTED CONSULTANT
-   * ============================================
-   */
-
-  const selectedConsultant =
-    selectedConsultantId
-      ? consultants.find(
-          (consultant) =>
-            consultant._id ===
-            selectedConsultantId
-        ) ?? null
-      : null;
-
-  /*
-   * ============================================
    * CUSTOMER DATA UPDATE
    * ============================================
    */
@@ -503,26 +234,22 @@ export default function BookPage() {
     field: keyof CustomerFormData,
     value: string
   ) => {
-    setCustomerData(
-      (previous) => ({
-        ...previous,
-        [field]: value,
-      })
-    );
+    setCustomerData((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
 
     /*
-     * Customer information changed,
-     * therefore any previously created
-     * pending booking is no longer valid.
+     * If customer information changes,
+     * the current pending booking is no
+     * longer guaranteed to represent the
+     * current form.
      */
 
     setShowSummary(false);
 
     setBookingMongoId(null);
     setBookingId(null);
-
-    setPaymentSuccess(false);
-    setPaymentDetails(null);
   };
 
   /*
@@ -534,21 +261,13 @@ export default function BookPage() {
   const resetBookingAfterServiceChange = (
     serviceId: string
   ) => {
-    setSelectedServiceId(
-      serviceId
-    );
+    setSelectedServiceId(serviceId);
 
     setSelectedMode(null);
-
-    setSelectedConsultantId(
-      null
-    );
-
     setSelectedDate(null);
     setSelectedTime(null);
 
     setShowSummary(false);
-
     setPaymentSuccess(false);
     setPaymentDetails(null);
 
@@ -571,15 +290,10 @@ export default function BookPage() {
   ) => {
     setSelectedMode(mode);
 
-    setSelectedConsultantId(
-      null
-    );
-
     setSelectedDate(null);
     setSelectedTime(null);
 
     setShowSummary(false);
-
     setPaymentSuccess(false);
     setPaymentDetails(null);
 
@@ -600,12 +314,7 @@ export default function BookPage() {
 
     setSelectedTime(null);
 
-    setSelectedConsultantId(
-      null
-    );
-
     setShowSummary(false);
-
     setPaymentSuccess(false);
     setPaymentDetails(null);
 
@@ -617,73 +326,19 @@ export default function BookPage() {
    * ============================================
    * TIME CHANGE
    * ============================================
-   *
-   * THIS IS THE IMPORTANT FIX.
-   *
-   * When the customer selects a time,
-   * automatically find a consultant who
-   * can actually handle that exact slot.
    */
 
   const handleTimeChange = (
     time: string
   ) => {
-    if (!selectedDate) {
-      return;
-    }
-
-    const consultant =
-      findConsultantForSlot(
-        selectedDate,
-        time
-      );
-
-    if (!consultant) {
-      setSelectedTime(null);
-      setSelectedConsultantId(
-        null
-      );
-
-      alert(
-        "This time slot is no longer available. Please select another time."
-      );
-
-      return;
-    }
-
-    /*
-     * Store the actual consultant ID.
-     */
-
-    setSelectedConsultantId(
-      consultant._id
-    );
-
     setSelectedTime(time);
 
     setShowSummary(false);
-
     setPaymentSuccess(false);
     setPaymentDetails(null);
 
     setBookingMongoId(null);
     setBookingId(null);
-
-    console.log(
-      "Consultant automatically assigned:",
-      {
-        consultantId:
-          consultant._id,
-
-        consultantName:
-          consultant.name,
-
-        date:
-          selectedDate,
-
-        time,
-      }
-    );
   };
 
   /*
@@ -697,7 +352,6 @@ export default function BookPage() {
     selectedMode &&
     selectedDate &&
     selectedTime &&
-    selectedConsultant &&
     customerData.fullName &&
     customerData.mobile &&
     customerData.email
@@ -720,19 +374,18 @@ export default function BookPage() {
           time:
             selectedTime,
 
-          /*
-           * Consultant is now actually
-           * assigned.
-           */
-
           consultantName:
-            selectedConsultant.name,
+            "To be assigned",
 
           customer:
             customerData,
 
           /*
            * Current service price from MongoDB.
+           *
+           * The final authoritative price is
+           * checked again by the server when
+           * the booking is created.
            */
 
           price:
@@ -760,28 +413,11 @@ export default function BookPage() {
       return;
     }
 
-    /*
-     * Extra safety check.
-     */
-
-    if (!selectedConsultantId) {
-      alert(
-        "Unable to assign a consultant for this time slot. Please select another time."
-      );
-
-      return;
-    }
-
     setShowSummary(true);
 
     console.log(
       "Booking Data:",
       bookingData
-    );
-
-    console.log(
-      "Selected Consultant ID:",
-      selectedConsultantId
     );
   };
 
@@ -790,7 +426,12 @@ export default function BookPage() {
    * CREATE DATABASE BOOKING
    * ============================================
    *
-   * Creates pending booking BEFORE Razorpay.
+   * This is the new Stage 1B step.
+   *
+   * It creates the booking BEFORE Razorpay.
+   *
+   * The server gets the real price from
+   * MongoDB.
    */
 
   const createDatabaseBooking =
@@ -800,17 +441,13 @@ export default function BookPage() {
       price: number;
       currency: string;
     } | null> => {
-      if (
-        !bookingData ||
-        !selectedConsultantId ||
-        !selectedConsultant
-      ) {
+      if (!bookingData) {
         return null;
       }
 
       /*
        * If a pending booking already exists
-       * for this exact booking attempt,
+       * for this current booking attempt,
        * don't create another one.
        */
 
@@ -819,41 +456,15 @@ export default function BookPage() {
         bookingId
       ) {
         return {
-          id:
-            bookingMongoId,
-
+          id: bookingMongoId,
           bookingId,
-
-          price:
-            bookingData.price,
-
-          currency:
-            bookingData.currency,
+          price: bookingData.price,
+          currency: bookingData.currency,
         };
       }
 
       try {
         setCreatingBooking(true);
-
-        /*
-         * Final client-side availability check.
-         */
-
-        const currentConsultant =
-          findConsultantForSlot(
-            bookingData.date,
-            bookingData.time
-          );
-
-        if (
-          !currentConsultant ||
-          currentConsultant._id !==
-            selectedConsultantId
-        ) {
-          throw new Error(
-            "The selected consultant is no longer available for this time slot. Please select another time."
-          );
-        }
 
         const response =
           await fetch(
@@ -866,49 +477,39 @@ export default function BookPage() {
                   "application/json",
               },
 
-              body:
-                JSON.stringify({
-                  serviceId:
-                    bookingData.serviceId,
+              body: JSON.stringify({
+                serviceId:
+                  bookingData.serviceId,
 
-                  mode:
-                    bookingData.mode,
+                mode:
+                  bookingData.mode,
 
-                  /*
-                   * Send the MongoDB consultant ID.
-                   */
+                date:
+                  bookingData.date,
 
-                  consultantId:
-                    selectedConsultantId,
+                time:
+                  bookingData.time,
 
-                  /*
-                   * Also send consultant for
-                   * compatibility with the current
-                   * /api/bookings validation.
-                   */
+                customer:
+                  bookingData.customer,
 
-                  consultant:
-                    selectedConsultant.name,
-
-                  date:
-                    bookingData.date,
-
-                  time:
-                    bookingData.time,
-
-                  customer:
-                    bookingData.customer,
-                }),
+                /*
+                 * userId is intentionally
+                 * omitted for now.
+                 *
+                 * Guest booking.
+                 *
+                 * Later the logged-in user's
+                 * account ID can be supplied.
+                 */
+              }),
             }
           );
 
         const data =
           await response.json();
 
-        if (
-          !response.ok ||
-          !data.success
-        ) {
+        if (!response.ok || !data.success) {
           throw new Error(
             data.error ||
               "Unable to create booking."
@@ -925,7 +526,7 @@ export default function BookPage() {
         }
 
         /*
-         * Store MongoDB IDs.
+         * Store MongoDB IDs in React state.
          */
 
         setBookingMongoId(
@@ -984,17 +585,6 @@ export default function BookPage() {
         return;
       }
 
-      if (
-        !selectedConsultantId ||
-        !selectedConsultant
-      ) {
-        alert(
-          "No consultant is assigned to this booking. Please select another time."
-        );
-
-        return;
-      }
-
       /*
        * Prevent accidental double-click.
        */
@@ -1020,7 +610,7 @@ export default function BookPage() {
         /*
          * ========================================
          * STEP 1
-         * CREATE PENDING BOOKING
+         * CREATE PENDING BOOKING IN MONGODB
          * ========================================
          */
 
@@ -1036,6 +626,9 @@ export default function BookPage() {
          * STEP 2
          * CHECK PAYMENT AMOUNT
          * ========================================
+         *
+         * The amount returned here comes from
+         * MongoDB through /api/bookings.
          */
 
         if (
@@ -1067,35 +660,42 @@ export default function BookPage() {
                   "application/json",
               },
 
-              body:
-                JSON.stringify({
-                  bookingId:
-                    databaseBooking.bookingId,
+              body: JSON.stringify({
+                /*
+                 * We now pass the database
+                 * customer-facing booking ID.
+                 *
+                 * The server will use this in
+                 * the next payment/database step.
+                 */
 
-                  serviceId:
-                    bookingData.serviceId,
+                bookingId:
+                  databaseBooking.bookingId,
 
-                  serviceName:
-                    bookingData.serviceName,
+                serviceId:
+                  bookingData.serviceId,
 
-                  amount:
-                    databaseBooking.price,
+                serviceName:
+                  bookingData.serviceName,
 
-                  currency:
-                    databaseBooking.currency,
+                amount:
+                  databaseBooking.price,
 
-                  customerName:
-                    bookingData.customer
-                      .fullName,
+                currency:
+                  databaseBooking.currency,
 
-                  customerEmail:
-                    bookingData.customer
-                      .email,
+                customerName:
+                  bookingData.customer
+                    .fullName,
 
-                  customerPhone:
-                    bookingData.customer
-                      .mobile,
-                }),
+                customerEmail:
+                  bookingData.customer
+                    .email,
+
+                customerPhone:
+                  bookingData.customer
+                    .mobile,
+              }),
             }
           );
 
@@ -1117,8 +717,7 @@ export default function BookPage() {
          */
 
         const options = {
-          key:
-            data.keyId,
+          key: data.keyId,
 
           amount:
             data.amount,
@@ -1156,12 +755,6 @@ export default function BookPage() {
             serviceId:
               bookingData.serviceId,
 
-            consultantId:
-              selectedConsultantId,
-
-            consultant:
-              selectedConsultant.name,
-
             date:
               bookingData.date,
 
@@ -1173,14 +766,20 @@ export default function BookPage() {
           },
 
           theme: {
-            color:
-              "#d6a63b",
+            color: "#d6a63b",
           },
 
           /*
            * ====================================
            * PAYMENT SUCCESS
            * ====================================
+           *
+           * IMPORTANT:
+           *
+           * We are NOT updating MongoDB here yet.
+           *
+           * That will happen in Stage 2 when
+           * /api/payment/verify is updated.
            */
 
           handler:
@@ -1195,6 +794,13 @@ export default function BookPage() {
 
                 /*
                  * Verify payment on server.
+                 *
+                 * Stage 2 will also update:
+                 *
+                 * Payment
+                 * Booking
+                 *
+                 * in MongoDB.
                  */
 
                 const verifyResponse =
@@ -1208,20 +814,25 @@ export default function BookPage() {
                           "application/json",
                       },
 
-                      body:
-                        JSON.stringify({
-                          razorpay_order_id:
-                            razorpayResponse.razorpay_order_id,
+                      body: JSON.stringify({
+                        razorpay_order_id:
+                          razorpayResponse.razorpay_order_id,
 
-                          razorpay_payment_id:
-                            razorpayResponse.razorpay_payment_id,
+                        razorpay_payment_id:
+                          razorpayResponse.razorpay_payment_id,
 
-                          razorpay_signature:
-                            razorpayResponse.razorpay_signature,
+                        razorpay_signature:
+                          razorpayResponse.razorpay_signature,
 
-                          bookingId:
-                            databaseBooking.bookingId,
-                        }),
+                        /*
+                         * We pass the booking ID
+                         * so Stage 2 can connect
+                         * payment → booking.
+                         */
+
+                        bookingId:
+                          databaseBooking.bookingId,
+                      }),
                     }
                   );
 
@@ -1244,7 +855,8 @@ export default function BookPage() {
                 );
 
                 /*
-                 * Store payment details.
+                 * Store payment details for
+                 * the current confirmation UI.
                  */
 
                 setPaymentDetails({
@@ -1255,21 +867,28 @@ export default function BookPage() {
                     verification.orderId,
                 });
 
+                /*
+                 * IMPORTANT:
+                 *
+                 * Booking ID now comes from
+                 * MongoDB.
+                 */
+
                 setBookingId(
                   databaseBooking.bookingId
                 );
 
                 /*
-                 * Show confirmation.
+                 * Show confirmation screen.
+                 *
+                 * Stage 2 will make sure the
+                 * database itself is also marked
+                 * paid/confirmed.
                  */
 
-                setPaymentSuccess(
-                  true
-                );
+                setPaymentSuccess(true);
 
-                setShowSummary(
-                  false
-                );
+                setShowSummary(false);
               } catch (error) {
                 console.error(
                   "Payment verification error:",
@@ -1300,13 +919,14 @@ export default function BookPage() {
          * ========================================
          * PAYMENT FAILURE
          * ========================================
+         *
+         * Stage 2 will update the pending
+         * database booking/payment status.
          */
 
-        razorpay.on(
+          razorpay.on(
           "payment.failed",
-          async function (
-            response: any
-          ) {
+          async function (response: any) {
             console.error(
               "Razorpay payment failed:",
               response
@@ -1314,14 +934,10 @@ export default function BookPage() {
 
             try {
               const orderId =
-                response?.error
-                  ?.metadata
-                  ?.order_id;
+                response?.error?.metadata?.order_id;
 
               const paymentId =
-                response?.error
-                  ?.metadata
-                  ?.payment_id;
+                response?.error?.metadata?.payment_id;
 
               if (orderId) {
                 await fetch(
@@ -1334,17 +950,16 @@ export default function BookPage() {
                         "application/json",
                     },
 
-                    body:
-                      JSON.stringify({
-                        bookingId:
-                          databaseBooking.bookingId,
+                    body: JSON.stringify({
+                      bookingId:
+                        databaseBooking.bookingId,
 
-                        razorpayOrderId:
-                          orderId,
+                      razorpayOrderId:
+                        orderId,
 
-                        razorpayPaymentId:
-                          paymentId || "",
-                      }),
+                      razorpayPaymentId:
+                        paymentId || "",
+                    }),
                   }
                 );
               }
@@ -1356,12 +971,11 @@ export default function BookPage() {
             }
 
             alert(
-              response?.error
-                ?.description ||
+              response?.error?.description ||
                 "Payment failed. Please try again."
             );
           }
-        );
+          );
 
         /*
          * ========================================
@@ -1522,7 +1136,8 @@ export default function BookPage() {
                     <strong>
                       {
                         bookingData
-                          .consultantName
+                          .consultantName ||
+                        "To be assigned"
                       }
                     </strong>
                   </div>
@@ -1638,10 +1253,8 @@ export default function BookPage() {
                 <div
                   className="booking-header"
                   style={{
-                    marginTop:
-                      "32px",
-                    marginBottom:
-                      "20px",
+                    marginTop: "32px",
+                    marginBottom: "20px",
                   }}
                 >
                   <p className="eyebrow">
@@ -1712,8 +1325,7 @@ export default function BookPage() {
                 <div
                   className="booking-next"
                   style={{
-                    marginTop:
-                      "32px",
+                    marginTop: "32px",
                   }}
                 >
                   <button
@@ -1875,122 +1487,27 @@ export default function BookPage() {
 
           {selectedServiceId &&
             selectedMode && (
-              <div className="booking-step">
+              <DateTimeSelector
+                availability={
+                  availability
+                }
 
-                {consultantsLoading && (
-                  <div className="booking-header">
-                    <p className="section-description">
-                      Loading consultant availability...
-                    </p>
-                  </div>
-                )}
+                selectedDate={
+                  selectedDate
+                }
 
-                {!consultantsLoading &&
-                  consultantsError && (
-                    <div className="booking-header">
-                      <p className="section-description">
-                        Unable to load consultant availability.
-                      </p>
+                selectedTime={
+                  selectedTime
+                }
 
-                      <p className="section-description">
-                        {consultantsError}
-                      </p>
+                onDateSelect={
+                  handleDateChange
+                }
 
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={
-                          loadConsultants
-                        }
-                      >
-                        Try Again →
-                      </button>
-                    </div>
-                  )}
-
-                {!consultantsLoading &&
-                  !consultantsError &&
-                  availableConsultants.length ===
-                    0 && (
-                    <div className="booking-header">
-                      <p className="section-description">
-                        No consultants are currently available for this consultation.
-                      </p>
-                    </div>
-                  )}
-
-                {!consultantsLoading &&
-                  !consultantsError &&
-                  availableConsultants.length >
-                    0 &&
-                  combinedAvailability.length ===
-                    0 && (
-                    <div className="booking-header">
-                      <p className="section-description">
-                        No available dates or time slots have been configured for this consultation yet.
-                      </p>
-                    </div>
-                  )}
-
-                {!consultantsLoading &&
-                  !consultantsError &&
-                  combinedAvailability.length >
-                    0 && (
-                    <DateTimeSelector
-                      availability={
-                        combinedAvailability
-                      }
-
-                      selectedDate={
-                        selectedDate
-                      }
-
-                      selectedTime={
-                        selectedTime
-                      }
-
-                      onDateSelect={
-                        handleDateChange
-                      }
-
-                      onTimeSelect={
-                        handleTimeChange
-                      }
-                    />
-                  )}
-
-                {/* Show assigned consultant after
-                    customer selects a time. */}
-
-                {selectedConsultant &&
-                  selectedDate &&
-                  selectedTime && (
-                    <div
-                      className="booking-header"
-                      style={{
-                        marginTop:
-                          "24px",
-                      }}
-                    >
-                      <p className="section-description">
-                        Consultant assigned for
-                        this slot:
-                      </p>
-
-                      <p
-                        className="section-description"
-                        style={{
-                          fontWeight:
-                            700,
-                        }}
-                      >
-                        {
-                          selectedConsultant.name
-                        }
-                      </p>
-                    </div>
-                  )}
-              </div>
+                onTimeSelect={
+                  handleTimeChange
+                }
+              />
             )}
 
           {/* STEP 5 */}
@@ -1998,8 +1515,7 @@ export default function BookPage() {
           {selectedServiceId &&
             selectedMode &&
             selectedDate &&
-            selectedTime &&
-            selectedConsultantId && (
+            selectedTime && (
               <CustomerDetails
                 category={
                   selectedService?.category ??
@@ -2022,7 +1538,6 @@ export default function BookPage() {
             selectedMode &&
             selectedDate &&
             selectedTime &&
-            selectedConsultantId &&
             customerData.fullName &&
             customerData.mobile &&
             customerData.email && (

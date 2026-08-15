@@ -8,7 +8,7 @@ export const services: Service[] = [
     description:
       "A focused consultation for general guidance and important life questions.",
     duration: null,
-    price: null,
+    price: 2000,
     consultantIds: [],
     availableModes: ["video", "voice"],
     active: true,
@@ -21,7 +21,7 @@ export const services: Service[] = [
     description:
       "A detailed consultation based on your birth chart and personal circumstances.",
     duration: null,
-    price: null,
+    price: 2000,
     consultantIds: [],
     availableModes: ["video", "voice"],
     active: true,
@@ -34,7 +34,7 @@ export const services: Service[] = [
     description:
       "A focused consultation for a specific question or concern.",
     duration: null,
-    price: null,
+    price: 2000,
     consultantIds: [],
     availableModes: ["video", "voice"],
     active: true,
@@ -47,7 +47,7 @@ export const services: Service[] = [
     description:
       "Personalized guidance related to career, professional decisions and business.",
     duration: null,
-    price: null,
+    price: 2000,
     consultantIds: [],
     availableModes: ["video", "voice"],
     active: true,
@@ -60,7 +60,7 @@ export const services: Service[] = [
     description:
       "Guidance regarding relationships, marriage and important personal decisions.",
     duration: null,
-    price: null,
+    price: 2000,
     consultantIds: [],
     availableModes: ["video", "voice"],
     active: true,
@@ -73,7 +73,7 @@ export const services: Service[] = [
     description:
       "Compatibility analysis based on the birth details of two individuals.",
     duration: null,
-    price: null,
+    price: 2000,
     consultantIds: [],
     availableModes: ["video", "voice"],
     active: true,
@@ -86,7 +86,7 @@ export const services: Service[] = [
     description:
       "A focused numerology consultation for personal guidance.",
     duration: null,
-    price: null,
+    price: 2000,
     consultantIds: [],
     availableModes: ["video", "voice"],
     active: true,
@@ -99,7 +99,7 @@ export const services: Service[] = [
     description:
       "A detailed analysis based on your numerological profile.",
     duration: null,
-    price: null,
+    price: 2000,
     consultantIds: [],
     availableModes: ["video", "voice"],
     active: true,
@@ -112,7 +112,7 @@ export const services: Service[] = [
     description:
       "Numerological analysis of a personal or business name.",
     duration: null,
-    price: null,
+    price: 2000,
     consultantIds: [],
     availableModes: ["video", "voice"],
     active: true,
@@ -125,7 +125,7 @@ export const services: Service[] = [
     description:
       "A focused tarot reading addressing one specific question.",
     duration: null,
-    price: null,
+    price: 2000,
     consultantIds: [],
     availableModes: ["video", "voice"],
     active: true,
@@ -138,7 +138,7 @@ export const services: Service[] = [
     description:
       "A tarot consultation covering up to three specific questions.",
     duration: null,
-    price: null,
+    price: 2000,
     consultantIds: [],
     availableModes: ["video", "voice"],
     active: true,
@@ -151,7 +151,7 @@ export const services: Service[] = [
     description:
       "A detailed tarot consultation for deeper personal guidance.",
     duration: null,
-    price: null,
+    price: 2000,
     consultantIds: [],
     availableModes: ["video", "voice"],
     active: true,

@@ -71,7 +71,8 @@ export const siteContent = {
   services: {
     eyebrow: "OUR SERVICES",
 
-    title: "Helping You Find Clarity Across Every Stage of Life",
+    title:
+      "Helping You Find Clarity Across Every Stage of Life",
 
     items: [
       {
@@ -109,19 +110,5 @@ export const siteContent = {
 
     description:
       "With years of experience in astrology, numerology and tarot, our mission is to guide you with honesty, clarity and practical insights.",
-
-consultants: [
-  {
-    name: "Deepak Ji",
-    role: "Vedic Astrology & Career Guidance",
-    image: "/images/consultants/deepak.jpg",
-  },
-  {
-    name: "Shweta Ji",
-    role: "Numerology & Tarot Expert",
-    image: "/images/consultants/shweta.jpg",
-  },
-],
-
   },
 };

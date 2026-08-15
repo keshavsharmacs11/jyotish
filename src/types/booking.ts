@@ -29,3 +29,71 @@ export type Service = {
 
   active: boolean;
 };
+
+export type CustomerDetails = {
+  fullName: string;
+  mobile: string;
+  email: string;
+
+  dob?: string;
+  birthTime?: string;
+  birthPlace?: string;
+  gender?: string;
+
+  concern?: string;
+  language?: string;
+
+  currentName?: string;
+
+  person2Name?: string;
+  person2Dob?: string;
+  person2BirthTime?: string;
+  person2BirthPlace?: string;
+
+  tarotQuestion?: string;
+};
+
+
+export type BookingStatus =
+  | "pending"
+  | "payment_pending"
+  | "confirmed"
+  | "completed"
+  | "cancelled";
+
+
+export type PaymentStatus =
+  | "pending"
+  | "paid"
+  | "failed"
+  | "refunded";
+
+
+export type Booking = {
+  id?: string;
+
+  serviceId: string;
+  serviceName: string;
+  category: ServiceCategory;
+
+  mode: BookingMode;
+
+  date: string;
+  time: string;
+
+  consultantId?: string;
+  consultantName?: string;
+
+  customer: CustomerDetails;
+
+  price: number;
+  currency: "INR";
+
+  status: BookingStatus;
+  paymentStatus: PaymentStatus;
+
+  paymentId?: string;
+
+  createdAt?: string;
+  updatedAt?: string;
+};
