@@ -1,76 +1,326 @@
-import { NextResponse } from "next/server";
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server";
+
 import Razorpay from "razorpay";
 
-import clientPromise from "@/lib/mongodb";
+import {
+  connectMongoose,
+} from "@/lib/mongodb";
+
 import Booking from "@/models/Booking";
 import Payment from "@/models/Payment";
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
+import {
+  getCustomerId,
+} from "@/lib/customerAuth";
 
-export async function POST(request: Request) {
+import {
+  checkRateLimit,
+} from "@/lib/rateLimit";
+
+import {
+  getClientIp,
+} from "@/lib/requestSecurity";
+
+const razorpay =
+  new Razorpay({
+    key_id:
+      process.env.RAZORPAY_KEY_ID || "",
+    key_secret:
+      process.env.RAZORPAY_KEY_SECRET || "",
+  });
+
+/*
+ * ============================================
+ * ENVIRONMENT VALIDATION
+ * ============================================
+ */
+
+function getRazorpayKeyId(): string {
+  const keyId =
+    process.env.RAZORPAY_KEY_ID;
+
+  if (!keyId) {
+    throw new Error(
+      "RAZORPAY_KEY_ID is not configured."
+    );
+  }
+
+  return keyId;
+}
+
+function getRazorpayKeySecret(): string {
+  const keySecret =
+    process.env.RAZORPAY_KEY_SECRET;
+
+  if (!keySecret) {
+    throw new Error(
+      "RAZORPAY_KEY_SECRET is not configured."
+    );
+  }
+
+  return keySecret;
+}
+
+/*
+ * ============================================
+ * NORMALIZE EMAIL
+ * ============================================
+ */
+
+function normalizeEmail(
+  value: unknown
+): string {
+  return String(
+    value || ""
+  )
+    .trim()
+    .toLowerCase();
+}
+
+/*
+ * ============================================
+ * NORMALIZE PHONE
+ * ============================================
+ */
+
+function normalizePhone(
+  value: unknown
+): string {
+  return String(
+    value || ""
+  )
+    .replace(
+      /\s+/g,
+      ""
+    )
+    .trim();
+}
+
+/*
+ * ============================================
+ * POST
+ * ============================================
+ */
+
+export async function POST(
+  request: NextRequest
+) {
   try {
-    const body = await request.json();
-
-    const {
-      bookingId,
-      serviceId,
-      serviceName,
-      customerName,
-      customerEmail,
-      customerPhone,
-    } = body;
-
     /*
-     * ============================================
-     * BASIC VALIDATION
-     * ============================================
+     * ========================================
+     * RATE LIMIT
+     * ========================================
      */
 
+    const clientIp =
+      getClientIp(request);
+
+    const rateLimit =
+      await checkRateLimit({
+        key:
+          `payment-create-order-ip:${clientIp}`,
+        limit: 15,
+        windowMs:
+          15 * 60 * 1000,
+      });
+
     if (
-      !bookingId ||
-      !serviceId ||
-      !serviceName ||
-      !customerName ||
-      !customerEmail ||
-      !customerPhone
+      !rateLimit.allowed
     ) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "Missing required booking information.",
+            "Too many payment requests. Please try again later.",
         },
-        { status: 400 }
+        {
+          status: 429,
+          headers: {
+            "Retry-After":
+              String(
+                rateLimit.retryAfterSeconds
+              ),
+          },
+        }
       );
     }
 
     /*
-     * ============================================
-     * DATABASE CONNECTION
-     * ============================================
+     * ========================================
+     * READ REQUEST
+     * ========================================
      */
 
-    const client = await clientPromise;
+    const contentLength = request.headers.get("content-length");
 
-    await client
-      .db("codepunkdb")
-      .command({ ping: 1 });
+    if (
+      contentLength &&
+      Number(contentLength) > 32 * 1024
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Payment request is too large.",
+        },
+        {
+          status: 413,
+        }
+      );
+    }
+
+    let body: Record<string, unknown>;
+
+    try {
+      const rawBody = await request.text();
+
+      if (
+        Buffer.byteLength(rawBody, "utf8") >
+        32 * 1024
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Payment request is too large.",
+          },
+          {
+            status: 413,
+          }
+        );
+      }
+
+      const parsed = JSON.parse(rawBody);
+
+      if (
+        !parsed ||
+        typeof parsed !== "object" ||
+        Array.isArray(parsed)
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Invalid payment request.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      body = parsed as Record<string, unknown>;
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid payment request.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const bookingId =
+      String(
+        body.bookingId || ""
+      ).trim();
+
+    const serviceId =
+      String(
+        body.serviceId || ""
+      ).trim();
 
     /*
-     * ============================================
+     * These are only used to bind a guest
+     * payment attempt to the booking data.
+     *
+     * For authenticated customers,
+     * ownership comes from the session.
+     */
+
+    const requestEmail =
+      normalizeEmail(
+        body.customerEmail
+      );
+
+    const requestPhone =
+      normalizePhone(
+        body.customerPhone
+      );
+
+    /*
+     * ========================================
+     * BASIC VALIDATION
+     * ========================================
+     */
+
+    if (
+      !bookingId ||
+      !serviceId
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Booking ID and service ID are required.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      bookingId.length > 100 ||
+      serviceId.length > 100
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Invalid payment request.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    /*
+     * ========================================
+     * ENVIRONMENT
+     * ========================================
+     */
+
+    getRazorpayKeyId();
+    getRazorpayKeySecret();
+
+    /*
+     * ========================================
+     * DATABASE
+     * ========================================
+     */
+
+    await connectMongoose();
+
+    /*
+     * ========================================
+     * GET AUTHENTICATED CUSTOMER
+     * ========================================
+     *
+     * Authenticated customer ownership is
+     * determined entirely from the session.
+     */
+
+    const authenticatedUserId =
+      await getCustomerId();
+
+    /*
+     * ========================================
      * FIND BOOKING
-     * ============================================
-     *
-     * IMPORTANT:
-     *
-     * We DO NOT trust the amount sent by
-     * the browser.
-     *
-     * The price comes from our Booking record,
-     * which was created from the MongoDB Service.
+     * ========================================
      */
 
     const booking =
@@ -85,38 +335,124 @@ export async function POST(request: Request) {
           error:
             "Booking not found.",
         },
-        { status: 404 }
-      );
-    }
-
-    /*
-     * ============================================
-     * PREVENT PAYMENT FOR ALREADY PAID BOOKING
-     * ============================================
-     */
-
-    if (
-      booking.paymentStatus === "paid" ||
-      booking.status === "confirmed"
-    ) {
-      return NextResponse.json(
         {
-          success: false,
-          error:
-            "This booking has already been paid.",
-        },
-        { status: 400 }
+          status: 404,
+        }
       );
     }
 
     /*
-     * ============================================
-     * VERIFY SERVICE
-     * ============================================
+     * ========================================
+     * BOOKING OWNERSHIP
+     * ========================================
+     *
+     * Logged-in customer:
+     *
+     *     booking.userId MUST equal session user.
+     *
+     * Guest booking:
+     *
+     *     booking.userId is null.
+     *
+     *     Because there is no account session,
+     *     bind the request to the booking's
+     *     customer email + phone.
+     *
+     * The browser never gets to choose an
+     * authenticated customer's userId.
+     */
+
+    if (booking.userId) {
+      if (!authenticatedUserId) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "You must be logged in to pay for this booking.",
+          },
+          {
+            status: 401,
+          }
+        );
+      }
+
+      if (
+        booking.userId.toString() !==
+        authenticatedUserId
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "You are not authorized to pay for this booking.",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
+    } else {
+      /*
+       * Guest booking.
+       *
+       * Require the payment request to match
+       * the customer details stored on the booking.
+       */
+
+      const bookingEmail =
+        normalizeEmail(
+          booking.customer?.email
+        );
+
+      const bookingPhone =
+        normalizePhone(
+          booking.customer?.mobile
+        );
+
+      if (
+        !requestEmail ||
+        !requestPhone
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Customer email and mobile are required for guest payment.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      if (
+        bookingEmail !==
+          requestEmail ||
+        bookingPhone !==
+          requestPhone
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Customer information does not match the booking.",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
+    }
+
+    /*
+     * ========================================
+     * SERVICE CONSISTENCY
+     * ========================================
      */
 
     if (
-      booking.serviceId !== serviceId
+      booking.serviceId !==
+      serviceId
     ) {
       return NextResponse.json(
         {
@@ -124,28 +460,61 @@ export async function POST(request: Request) {
           error:
             "Service does not match the booking.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
     /*
-     * ============================================
-     * GET AUTHORITATIVE PRICE
-     * ============================================
+     * ========================================
+     * PREVENT PAYMENT FOR FINALIZED BOOKING
+     * ========================================
+     */
+
+    if (
+      booking.paymentStatus ===
+        "paid" ||
+      booking.status ===
+        "confirmed" ||
+      booking.status ===
+        "completed" ||
+      booking.status ===
+        "cancelled"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "This booking is not available for payment.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    /*
+     * ========================================
+     * AUTHORITATIVE PAYMENT DATA
+     * ========================================
      *
-     * This is the price snapshot stored in
-     * the booking.
-     *
-     * Admin can later change Service.price,
-     * but this booking remains at the price
-     * agreed when it was created.
+     * NEVER trust amount/currency from the
+     * browser.
      */
 
     const amount =
-      booking.price;
+      Number(
+        booking.price
+      );
 
     const currency =
-      booking.currency || "INR";
+      String(
+        booking.currency ||
+          "INR"
+      )
+        .trim()
+        .toUpperCase();
 
     if (
       !Number.isFinite(amount) ||
@@ -157,28 +526,115 @@ export async function POST(request: Request) {
           error:
             "Invalid booking amount.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      !currency ||
+      currency.length !== 3
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Invalid booking currency.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const amountInPaise =
+      Math.round(
+        amount * 100
+      );
+
+    if (
+      !Number.isSafeInteger(
+        amountInPaise
+      ) ||
+      amountInPaise <= 0
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Invalid payment amount.",
+        },
+        {
+          status: 400,
+        }
       );
     }
 
     /*
-     * ============================================
-     * REUSE EXISTING RAZORPAY ORDER
-     * ============================================
-     *
-     * If an order was already created for
-     * this booking, reuse it.
-     *
-     * This avoids creating unnecessary
-     * Razorpay orders when a customer retries.
+     * ========================================
+     * REUSE EXISTING BOOKING ORDER
+     * ========================================
      */
 
-    if (booking.razorpayOrderId) {
+    if (
+      booking.razorpayOrderId
+    ) {
       const existingPayment =
         await Payment.findOne({
           razorpayOrderId:
             booking.razorpayOrderId,
         });
+
+      if (
+        !existingPayment
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Existing payment information is inconsistent.",
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      if (
+        existingPayment.bookingId.toString() !==
+        booking._id.toString()
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Existing payment information is inconsistent.",
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      if (
+        existingPayment.amount !==
+          amount ||
+        existingPayment.currency
+          .toUpperCase() !==
+          currency
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Existing payment information does not match the booking.",
+          },
+          {
+            status: 409,
+          }
+        );
+      }
 
       return NextResponse.json({
         success: true,
@@ -187,16 +643,15 @@ export async function POST(request: Request) {
           booking.razorpayOrderId,
 
         amount:
-          Math.round(amount * 100),
+          amountInPaise,
 
         currency,
 
         keyId:
-          process.env.RAZORPAY_KEY_ID,
+          getRazorpayKeyId(),
 
         paymentStatus:
-          existingPayment?.status ||
-          "pending",
+          existingPayment.status,
 
         bookingId:
           booking.bookingId,
@@ -204,15 +659,87 @@ export async function POST(request: Request) {
     }
 
     /*
-     * ============================================
-     * CREATE RAZORPAY ORDER
-     * ============================================
+     * ========================================
+     * RECOVER EXISTING PAYMENT RECORD
+     * ========================================
+     *
+     * This handles a partial local state where:
+     *
+     * Payment exists
+     *      +
+     * Payment contains a Razorpay order ID
+     *      +
+     * Booking.razorpayOrderId is empty
+     *
+     * Instead of creating another Razorpay
+     * order, reconnect the booking to the
+     * existing payment order.
      */
 
-    const amountInPaise =
-      Math.round(
-        amount * 100
-      );
+    const existingBookingPayment =
+      await Payment.findOne({
+        bookingId:
+          booking._id,
+      }).sort({
+        createdAt: -1,
+      });
+
+    if (
+      existingBookingPayment
+        ?.razorpayOrderId
+    ) {
+      if (
+        existingBookingPayment.amount !==
+          amount ||
+        existingBookingPayment.currency
+          .toUpperCase() !==
+          currency
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Existing payment information does not match the booking.",
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      booking.razorpayOrderId =
+        existingBookingPayment.razorpayOrderId;
+
+      await booking.save();
+
+      return NextResponse.json({
+        success: true,
+
+        orderId:
+          existingBookingPayment
+            .razorpayOrderId,
+
+        amount:
+          amountInPaise,
+
+        currency,
+
+        keyId:
+          getRazorpayKeyId(),
+
+        paymentStatus:
+          existingBookingPayment.status,
+
+        bookingId:
+          booking.bookingId,
+      });
+    }
+
+    /*
+     * ========================================
+     * CREATE RAZORPAY ORDER
+     * ========================================
+     */
 
     const order =
       await razorpay.orders.create({
@@ -235,20 +762,67 @@ export async function POST(request: Request) {
             booking.serviceName,
 
           customerName:
-            booking.customer.fullName,
+            booking.customer
+              .fullName,
 
           customerEmail:
-            booking.customer.email,
+            booking.customer
+              .email,
 
           customerPhone:
-            booking.customer.mobile,
+            booking.customer
+              .mobile,
         },
       });
 
     /*
-     * ============================================
-     * SAVE RAZORPAY ORDER ID TO BOOKING
-     * ============================================
+     * ========================================
+     * CREATE PAYMENT RECORD
+     * ========================================
+     */
+
+    try {
+      await Payment.create({
+        bookingId:
+          booking._id,
+
+        razorpayOrderId:
+          order.id,
+
+        razorpayPaymentId:
+          "",
+
+        amount,
+
+        currency,
+
+        status:
+          "pending",
+
+        refundStatus:
+          "none",
+      });
+    } catch {
+      console.error(
+        "PAYMENT RECORD CREATION FAILED"
+      );
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Unable to create the payment record.",
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    /*
+     * ========================================
+     * SAVE RAZORPAY ORDER ID
+     * ========================================
      */
 
     booking.razorpayOrderId =
@@ -257,33 +831,9 @@ export async function POST(request: Request) {
     await booking.save();
 
     /*
-     * ============================================
-     * CREATE PAYMENT RECORD
-     * ============================================
-     */
-
-    await Payment.create({
-      bookingId:
-        booking._id,
-
-      razorpayOrderId:
-        order.id,
-
-      razorpayPaymentId:
-        "",
-
-      amount,
-
-      currency,
-
-      status:
-        "pending",
-    });
-
-    /*
-     * ============================================
-     * RESPONSE
-     * ============================================
+     * ========================================
+     * SUCCESS
+     * ========================================
      */
 
     return NextResponse.json({
@@ -299,7 +849,7 @@ export async function POST(request: Request) {
         order.currency,
 
       keyId:
-        process.env.RAZORPAY_KEY_ID,
+        getRazorpayKeyId(),
 
       bookingId:
         booking.bookingId,
@@ -307,10 +857,9 @@ export async function POST(request: Request) {
       paymentStatus:
         "pending",
     });
-  } catch (error) {
+  } catch {
     console.error(
-      "Razorpay order creation error:",
-      error
+      "RAZORPAY ORDER CREATION FAILED"
     );
 
     return NextResponse.json(
@@ -319,7 +868,9 @@ export async function POST(request: Request) {
         error:
           "Unable to create Razorpay payment order.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }

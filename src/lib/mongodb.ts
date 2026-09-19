@@ -35,7 +35,9 @@ declare global {
   var _mongoose:
     | {
         conn: typeof mongoose | null;
-        promise: Promise<typeof mongoose> | null;
+        promise:
+          | Promise<typeof mongoose>
+          | null;
       }
     | undefined;
 }
@@ -75,13 +77,18 @@ if (process.env.NODE_ENV === "development") {
  *
  * Our Mongoose models use this connection.
  *
- * Example:
+ * The database selected by MONGODB_URI
+ * is the authoritative database for:
  *
- * Service
  * Booking
- * User
  * Payment
+ * User
  * Consultant
+ * CustomerSession
+ * PasswordResetToken
+ * RateLimit
+ * SlotHold
+ * RazorpayWebhookEvent
  */
 
 const mongooseCache =
@@ -91,7 +98,8 @@ const mongooseCache =
   };
 
 if (process.env.NODE_ENV === "development") {
-  global._mongoose = mongooseCache;
+  global._mongoose =
+    mongooseCache;
 }
 
 export async function connectMongoose() {

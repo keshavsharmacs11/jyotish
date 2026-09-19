@@ -1,10 +1,27 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
 
-const SESSION_COOKIE_NAME = "customer_session";
+import {
+  connectMongoose,
+} from "@/lib/mongodb";
+
+import User from "@/models/User";
+import CustomerSession from "@/models/CustomerSession";
+
+const SESSION_COOKIE_NAME =
+  "customer_session";
+
+const SESSION_DAYS = 30;
+
+const SESSION_MAX_AGE =
+  SESSION_DAYS *
+  24 *
+  60 *
+  60;
 
 function getSessionSecret(): string {
-  const secret = process.env.CUSTOMER_SESSION_SECRET;
+  const secret =
+    process.env.CUSTOMER_SESSION_SECRET;
 
   if (!secret) {
     throw new Error(
@@ -17,188 +34,74 @@ function getSessionSecret(): string {
 
 /*
  * ============================================
- * CREATE SESSION TOKEN
+ * HASH SESSION SECRET
  * ============================================
+ *
+ * The raw session secret is only kept in the
+ * browser cookie.
+ *
+ * MongoDB stores only its SHA-256 hash.
  */
 
-export function createCustomerSession(
-  userId: string
+function hashSessionSecret(
+  sessionSecret: string
 ): string {
-  const secret = getSessionSecret();
-
-  const signature = crypto
-    .createHmac("sha256", secret)
-    .update(userId)
+  return crypto
+    .createHash("sha256")
+    .update(
+      sessionSecret +
+        getSessionSecret()
+    )
     .digest("hex");
-
-  return `${userId}.${signature}`;
 }
 
 /*
  * ============================================
- * VERIFY SESSION TOKEN
- * ============================================
- */
-
-export function verifyCustomerSession(
-  token: string
-): string | null {
-  try {
-    if (!token) {
-      console.error(
-        "CUSTOMER AUTH: No session token provided."
-      );
-
-      return null;
-    }
-
-    const secret = getSessionSecret();
-
-    /*
-     * Token format:
-     *
-     * userId.signature
-     */
-
-    const separatorIndex =
-      token.lastIndexOf(".");
-
-    if (separatorIndex === -1) {
-      console.error(
-        "CUSTOMER AUTH: Invalid token format."
-      );
-
-      return null;
-    }
-
-    const userId = token.substring(
-      0,
-      separatorIndex
-    );
-
-    const signature = token.substring(
-      separatorIndex + 1
-    );
-
-    if (!userId || !signature) {
-      console.error(
-        "CUSTOMER AUTH: Missing userId or signature."
-      );
-
-      return null;
-    }
-
-    /*
-     * User ID should be a MongoDB ObjectId.
-     */
-
-    if (!/^[a-fA-F0-9]{24}$/.test(userId)) {
-      console.error(
-        "CUSTOMER AUTH: Invalid user ID format."
-      );
-
-      return null;
-    }
-
-    /*
-     * Signature should be SHA-256
-     * represented as 64 hexadecimal characters.
-     */
-
-    if (
-      !/^[a-fA-F0-9]{64}$/.test(
-        signature
-      )
-    ) {
-      console.error(
-        "CUSTOMER AUTH: Invalid signature format."
-      );
-
-      return null;
-    }
-
-    const expectedSignature =
-      crypto
-        .createHmac(
-          "sha256",
-          secret
-        )
-        .update(userId)
-        .digest("hex");
-
-    /*
-     * Compare signatures safely.
-     */
-
-    const providedBuffer =
-      Buffer.from(
-        signature,
-        "hex"
-      );
-
-    const expectedBuffer =
-      Buffer.from(
-        expectedSignature,
-        "hex"
-      );
-
-    if (
-      providedBuffer.length !==
-      expectedBuffer.length
-    ) {
-      console.error(
-        "CUSTOMER AUTH: Signature length mismatch."
-      );
-
-      return null;
-    }
-
-    if (
-      !crypto.timingSafeEqual(
-        providedBuffer,
-        expectedBuffer
-      )
-    ) {
-      console.error(
-        "CUSTOMER AUTH: Signature verification failed."
-      );
-
-      return null;
-    }
-
-    console.log(
-      "CUSTOMER AUTH: Session verified for user:",
-      userId
-    );
-
-    return userId;
-  } catch (error) {
-    console.error(
-      "CUSTOMER SESSION VERIFICATION ERROR:",
-      error
-    );
-
-    return null;
-  }
-}
-
-/*
- * ============================================
- * SET CUSTOMER SESSION
+ * CREATE SESSION
  * ============================================
  */
 
 export async function setCustomerSession(
   userId: string
 ) {
-  const cookieStore = await cookies();
+  await connectMongoose();
 
-  const token =
-    createCustomerSession(userId);
+  /*
+   * Generate a completely opaque random
+   * session credential.
+   *
+   * 32 bytes = 256 bits.
+   */
+
+  const sessionSecret =
+    crypto.randomBytes(32)
+      .toString("hex");
+
+  const sessionHash =
+    hashSessionSecret(
+      sessionSecret
+    );
+
+  const expiresAt =
+    new Date(
+      Date.now() +
+        SESSION_MAX_AGE * 1000
+    );
+
+  await CustomerSession.create({
+    sessionHash,
+    userId,
+    expiresAt,
+    lastUsedAt: new Date(),
+    revokedAt: null,
+  });
+
+  const cookieStore =
+    await cookies();
 
   cookieStore.set(
     SESSION_COOKIE_NAME,
-    token,
+    sessionSecret,
     {
       httpOnly: true,
 
@@ -211,19 +114,14 @@ export async function setCustomerSession(
       path: "/",
 
       maxAge:
-        60 * 60 * 24 * 30,
+        SESSION_MAX_AGE,
     }
-  );
-
-  console.log(
-    "CUSTOMER AUTH: Session created for user:",
-    userId
   );
 }
 
 /*
  * ============================================
- * GET CURRENT CUSTOMER ID
+ * GET CURRENT CUSTOMER
  * ============================================
  */
 
@@ -239,41 +137,82 @@ export async function getCustomerId(): Promise<
         SESSION_COOKIE_NAME
       );
 
-    if (!cookie) {
-      console.error(
-        "CUSTOMER AUTH: customer_session cookie not found."
-      );
-
+    if (!cookie?.value) {
       return null;
     }
 
-    console.log(
-      "CUSTOMER AUTH: customer_session cookie found."
-    );
-
-    /*
-     * Don't print the actual token.
-     */
-
-    const userId =
-      verifyCustomerSession(
+    const sessionHash =
+      hashSessionSecret(
         cookie.value
       );
 
-    if (!userId) {
-      console.error(
-        "CUSTOMER AUTH: Cookie exists but could not be verified."
+    await connectMongoose();
+
+    const session =
+      await CustomerSession.findOne({
+        sessionHash,
+        revokedAt: null,
+        expiresAt: {
+          $gt: new Date(),
+        },
+      });
+
+    if (!session) {
+      return null;
+    }
+
+    const user =
+      await User.findOne({
+        _id: session.userId,
+        role: "customer",
+      })
+        .select("_id")
+        .lean();
+
+    if (!user) {
+      /*
+       * The account no longer exists as a
+       * customer. Revoke the session.
+       */
+
+      await CustomerSession.updateOne(
+        {
+          _id: session._id,
+        },
+        {
+          $set: {
+            revokedAt: new Date(),
+          },
+        }
       );
 
       return null;
     }
 
-    return userId;
-  } catch (error) {
-    console.error(
-      "GET CUSTOMER ID ERROR:",
-      error
+    /*
+     * Update session activity.
+     *
+     * We don't log any user/session
+     * credentials here.
+     */
+
+    await CustomerSession.updateOne(
+      {
+        _id: session._id,
+      },
+      {
+        $set: {
+          lastUsedAt: new Date(),
+        },
+      }
     );
+
+    return session.userId.toString();
+  } catch {
+    /*
+     * Authentication failures should not
+     * expose internal implementation details.
+     */
 
     return null;
   }
@@ -281,15 +220,73 @@ export async function getCustomerId(): Promise<
 
 /*
  * ============================================
- * CLEAR SESSION
+ * LOG OUT CURRENT SESSION
  * ============================================
  */
 
 export async function clearCustomerSession() {
-  const cookieStore =
-    await cookies();
+  try {
+    const cookieStore =
+      await cookies();
 
-  cookieStore.delete(
-    SESSION_COOKIE_NAME
+    const cookie =
+      cookieStore.get(
+        SESSION_COOKIE_NAME
+      );
+
+    if (cookie?.value) {
+      const sessionHash =
+        hashSessionSecret(
+          cookie.value
+        );
+
+      await connectMongoose();
+
+      await CustomerSession.updateOne(
+        {
+          sessionHash,
+          revokedAt: null,
+        },
+        {
+          $set: {
+            revokedAt: new Date(),
+          },
+        }
+      );
+    }
+  } finally {
+    const cookieStore =
+      await cookies();
+
+    cookieStore.delete(
+      SESSION_COOKIE_NAME
+    );
+  }
+}
+
+/*
+ * ============================================
+ * REVOKE ALL CUSTOMER SESSIONS
+ * ============================================
+ *
+ * Used after password reset or another
+ * high-security account event.
+ */
+
+export async function revokeAllCustomerSessions(
+  userId: string
+) {
+  await connectMongoose();
+
+  await CustomerSession.updateMany(
+    {
+      userId,
+      revokedAt: null,
+    },
+    {
+      $set: {
+        revokedAt: new Date(),
+      },
+    }
   );
 }

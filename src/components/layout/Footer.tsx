@@ -1,98 +1,180 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function Footer() {
+  const { language, t } = useLanguage();
+
+  const quickLinks =
+    language === "hi"
+      ? [
+          {
+            label: "होम",
+            href: "/",
+          },
+          {
+            label: "हमारे बारे में",
+            href: "/about",
+          },
+          {
+            label: "सेवाएँ",
+            href: "/services",
+          },
+          {
+            label: "शॉप",
+            href: "/shop",
+          },
+          {
+            label: "संपर्क करें",
+            href: "/contact",
+          },
+        ]
+      : [
+          {
+            label: "Home",
+            href: "/",
+          },
+          {
+            label: "About",
+            href: "/about",
+          },
+          {
+            label: "Services",
+            href: "/services",
+          },
+          {
+            label: "Shop",
+            href: "/shop",
+          },
+          {
+            label: "Contact",
+            href: "/contact",
+          },
+        ];
+
+  const services =
+    language === "hi"
+      ? [
+          "वैदिक ज्योतिष",
+          "अंक ज्योतिष",
+          "टैरो रीडिंग",
+          "करियर मार्गदर्शन",
+        ]
+      : [
+          "Vedic Astrology",
+          "Numerology",
+          "Tarot Reading",
+          "Career Guidance",
+        ];
+
   return (
     <footer className="footer">
       <div className="site-container">
 
         <div className="footer-grid">
 
-          {/* Brand */}
+          {/* ======================================
+              BRAND
+          ====================================== */}
 
           <div>
-
-            <Image
-              src="/images/brand/logo.png"
-              alt="Akshaanshh Jyotish"
-              width={180}
-              height={70}
-              className="footer-logo"
-            />
+            <div className="footer-logo-wrapper">
+              <Image
+                src="/images/brand/logo-navbar.png"
+                alt="Akshaanshh Jyotish"
+                width={180}
+                height={70}
+                className="footer-logo"
+              />
+            </div>
 
             <p className="footer-description">
-              Personalized Astrology, Numerology and Tarot
-              consultations to help you make confident
-              decisions in life.
+              {t("footer.description")}
             </p>
-
           </div>
 
-          {/* Quick Links */}
+          {/* ======================================
+              QUICK LINKS
+          ====================================== */}
 
           <div>
-
-            <h3>Quick Links</h3>
+            <h3>
+              {t("footer.quickLinks")}
+            </h3>
 
             <ul>
-
-              <li><Link href="/">Home</Link></li>
-
-              <li><Link href="/about">About</Link></li>
-
-              <li><Link href="/services">Services</Link></li>
-
-              <li><Link href="/contact">Contact</Link></li>
-
+              {quickLinks.map((item) => (
+                <li key={item.href}>
+                  <Link href={item.href}>
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
-
           </div>
 
-          {/* Services */}
+          {/* ======================================
+              SERVICES
+          ====================================== */}
 
           <div>
-
-            <h3>Services</h3>
+            <h3>
+              {t("footer.services")}
+            </h3>
 
             <ul>
-
-              <li>Vedic Astrology</li>
-
-              <li>Numerology</li>
-
-              <li>Tarot Reading</li>
-
-              <li>Career Guidance</li>
-
+              {services.map((service) => (
+                <li key={service}>
+                  {service}
+                </li>
+              ))}
             </ul>
-
           </div>
 
-          {/* Contact */}
+          {/* ======================================
+              CONTACT
+          ====================================== */}
 
           <div>
-
-            <h3>Contact</h3>
+            <h3>
+              {t("footer.contact")}
+            </h3>
 
             <ul>
+              <li>
+                📞 +91 XXXXX XXXXX
+              </li>
 
-              <li>📞 +91 XXXXX XXXXX</li>
+              <li>
+                ✉{" "}
+                <a
+                  href="mailto:info.akshaanshhjyotish@gmail.com"
+                >
+                  info.akshaanshhjyotish@gmail.com
+                </a>
+              </li>
 
-              <li>✉ contact@akshaanshhjyotish.com</li>
-
-              <li>📍 India</li>
-
+              <li>
+                📍{" "}
+                {language === "hi"
+                  ? "भारत"
+                  : "India"}
+              </li>
             </ul>
-
           </div>
 
         </div>
 
+        {/* ======================================
+            FOOTER BOTTOM
+        ====================================== */}
+
         <div className="footer-bottom">
-
-          © {new Date().getFullYear()} Akshaanshh Jyotish.
-          All Rights Reserved.
-
+          © {new Date().getFullYear()}{" "}
+          Akshaanshh Jyotish.{" "}
+          {t("footer.copyright")}
         </div>
 
       </div>

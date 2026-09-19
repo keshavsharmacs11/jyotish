@@ -1,0 +1,66 @@
+.page {
+  min-height: 100vh;
+  padding: 40px 20px 70px;
+  background: #f7f5f0;
+  color: #18202b;
+}
+
+.card {
+  width: min(860px, 100%);
+  margin: 0 auto;
+  padding: 34px;
+  border: 1px solid #e6dccb;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 20px 70px rgba(28, 31, 36, 0.08);
+}
+
+.topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+.brand { color: #9d741f; font-size: 12px; font-weight: 800; letter-spacing: 3px; }
+.badge { display: inline-flex; margin-top: 12px; padding: 7px 10px; border-radius: 999px; background: #f7f0e2; color: #8e691f; font-size: 11px; font-weight: 800; letter-spacing: 1.4px; }
+.backLink { color: #6c5b3b; text-decoration: none; font-weight: 700; }
+.card h1 { margin: 26px 0 10px; color: #101823; font-size: clamp(30px, 5vw, 44px); line-height: 1.08; }
+.lead { margin: 0; max-width: 720px; color: #68717c; font-size: 16px; line-height: 1.7; }
+.identityStrip { display: flex; align-items: center; gap: 16px; margin: 28px 0; padding: 16px; border: 1px solid #eee5d8; border-radius: 16px; background: #fbfaf7; }
+.avatar, .photoPreview { width: 72px; height: 72px; flex: 0 0 72px; overflow: hidden; display: grid; place-items: center; border-radius: 18px; background: #f2eadb; color: #9b7628; font-size: 24px; font-weight: 800; }
+.avatar img, .photoPreview img { width: 100%; height: 100%; object-fit: cover; }
+.identityStrip strong { display: block; color: #18202b; }
+.identityStrip span { display: block; margin-top: 5px; color: #78818c; font-size: 13px; }
+.form { display: grid; gap: 18px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.field { display: grid; gap: 8px; }
+.field span, .sectionTitle { color: #2e3946; font-size: 13px; font-weight: 800; }
+.field input { width: 100%; box-sizing: border-box; padding: 13px 14px; border: 1px solid #ded9d0; border-radius: 12px; background: #fff; color: #17202a; font: inherit; outline: none; }
+.field input:focus { border-color: #c29b4b; box-shadow: 0 0 0 4px rgba(194, 155, 75, 0.12); }
+.field input:disabled { background: #f7f5f0; color: #7e8792; }
+.sectionTitle { padding-top: 8px; }
+.photoRow { display: flex; align-items: center; gap: 18px; padding: 16px; border: 1px solid #eee5d8; border-radius: 16px; background: #fbfaf7; }
+.photoControls p { margin: 7px 0 12px; color: #7b838d; font-size: 13px; }
+.modeGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mode { display: flex; align-items: center; gap: 12px; padding: 16px; text-align: left; border: 1px solid #ded9d0; border-radius: 14px; background: #fff; cursor: pointer; }
+.mode:disabled { cursor: default; opacity: .75; }
+.modeSelected { border-color: #d1aa5d; background: #fffaf0; }
+.modeCheck { width: 24px; height: 24px; display: grid; place-items: center; flex: 0 0 24px; border-radius: 50%; border: 1px solid #d5cec2; color: #8e691f; font-weight: 800; }
+.modeSelected .modeCheck { border-color: #d1aa5d; background: #f3e4c3; }
+.mode strong { display: block; color: #1b2530; }
+.mode small { display: block; margin-top: 4px; color: #7b838d; }
+.error, .success, .locked { padding: 13px 15px; border-radius: 12px; font-size: 14px; line-height: 1.6; }
+.error { border: 1px solid #ecc7c7; background: #fff4f4; color: #9b3333; }
+.success { border: 1px solid #cfe1cf; background: #f3faf3; color: #2f6d38; }
+.locked { margin: 24px 0; border: 1px solid #eadfcf; background: #fbf8f1; color: #6b665e; }
+.locked p { margin: 7px 0 0; }
+.actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px; }
+.primaryButton, .secondaryButton { display: inline-flex; justify-content: center; align-items: center; min-height: 46px; padding: 0 18px; border-radius: 12px; font: inherit; font-weight: 800; text-decoration: none; cursor: pointer; }
+.primaryButton { border: 1px solid #1b2633; background: #1b2633; color: #fff; }
+.secondaryButton { border: 1px solid #ded9d0; background: #fff; color: #5e5a53; }
+.footerNote, .muted { margin-top: 22px; color: #7a838d; font-size: 13px; line-height: 1.6; }
+
+@media (max-width: 720px) {
+  .page { padding: 20px 12px 40px; }
+  .card { padding: 22px 16px; border-radius: 18px; }
+  .topbar { flex-direction: column; }
+  .grid, .modeGrid { grid-template-columns: 1fr; }
+  .photoRow { align-items: flex-start; flex-direction: column; }
+  .actions { flex-direction: column-reverse; }
+  .primaryButton, .secondaryButton { width: 100%; }
+}

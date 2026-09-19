@@ -1,208 +1,247 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
+import { useLanguage } from "@/context/LanguageContext";
 import { Booking } from "@/types/booking";
 
 type BookingSummaryProps = {
   booking: Booking;
-  onProceedToPayment: () => void;
+  onProceedToPayment: () => Promise<void> | void;
 };
+
+function formatDate(
+  date: string,
+  language: "en" | "hi"
+): string {
+  const [year, month, day] = date.split("-").map(Number);
+
+  if (!year || !month || !day) {
+    return date;
+  }
+
+  return new Intl.DateTimeFormat(
+    language === "hi" ? "hi-IN" : "en-IN",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "Asia/Kolkata",
+    }
+  ).format(
+    new Date(
+      Date.UTC(year, month - 1, day, 6)
+    )
+  );
+}
+
+function formatMode(
+  mode: Booking["mode"],
+  language: "en" | "hi"
+): string {
+  if (language === "hi") {
+    return mode === "video"
+      ? "वीडियो कॉल"
+      : "वॉइस कॉल";
+  }
+
+  return mode === "video"
+    ? "Video Call"
+    : "Voice Call";
+}
 
 export default function BookingSummary({
   booking,
   onProceedToPayment,
 }: BookingSummaryProps) {
-  const formattedDate = new Date(
-    `${booking.date}T00:00:00`
-  ).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const { language } = useLanguage();
+  const isHindi = language === "hi";
 
-  const formattedMode =
-    booking.mode === "video"
-      ? "Video Call"
-      : "Voice Call";
+  const [paymentStarting, setPaymentStarting] =
+    useState(false);
 
-  const formattedPrice =
-    booking.price > 0
-      ? `₹${booking.price.toLocaleString("en-IN")}`
-      : "To be confirmed";
+  /*
+   * Reset the local loading state when the
+   * selected booking details change.
+   *
+   * This component does not create the booking
+   * or process payment. It only delegates the
+   * existing payment action to the parent.
+   */
+  useEffect(() => {
+    setPaymentStarting(false);
+  }, [
+    booking.serviceId,
+    booking.mode,
+    booking.date,
+    booking.time,
+    booking.customer?.email,
+    booking.price,
+  ]);
+
+  const handleProceedToPayment = async () => {
+    if (paymentStarting) {
+      return;
+    }
+
+    setPaymentStarting(true);
+
+    try {
+      await onProceedToPayment();
+    } catch (error) {
+      setPaymentStarting(false);
+      throw error;
+    }
+  };
+
+  const formattedDate = formatDate(
+    booking.date,
+    language
+  );
+
+  const formattedMode = formatMode(
+    booking.mode,
+    language
+  );
+
+  const amount = Number(booking.price || 0);
 
   return (
-    <section className="booking-summary">
-
-      {/* ================================
-          HEADER
-      ================================= */}
-
-      <div className="booking-header">
-        <p className="eyebrow">
-          STEP 6
-        </p>
-
-        <h2 className="section-heading">
-          Review Your Booking
-        </h2>
-
-        <p className="section-description">
-          Please review all your consultation
-          details carefully before proceeding
-          to secure payment.
-        </p>
-      </div>
-
+    <section
+      className="booking-summary"
+      aria-labelledby="booking-summary-title"
+    >
       <div className="booking-summary-card">
+        <div className="booking-header">
+          <p className="eyebrow">
+            {isHindi ? "बुकिंग की समीक्षा" : "REVIEW BOOKING"}
+          </p>
 
-        {/* ================================
-            CONSULTATION
-        ================================= */}
+          <h2
+            id="booking-summary-title"
+            className="section-heading"
+          >
+            {isHindi
+              ? "अपनी बुकिंग की जानकारी जाँचें"
+              : "Review Your Booking"}
+          </h2>
+
+          <p className="section-description">
+            {isHindi
+              ? "भुगतान से पहले अपनी परामर्श जानकारी की एक बार पुष्टि कर लें।"
+              : "Please review your consultation details once before proceeding to payment."}
+          </p>
+        </div>
+
+        <div className="booking-summary-divider" />
 
         <div className="booking-summary-section">
-
           <p className="booking-summary-label">
-            Consultation
+            {isHindi ? "परामर्श" : "Consultation"}
           </p>
 
           <h3 className="booking-summary-service">
             {booking.serviceName}
           </h3>
-
         </div>
 
         <div className="booking-summary-divider" />
 
-        {/* ================================
-            CONSULTATION DETAILS
-        ================================= */}
-
         <div className="booking-summary-grid">
-
           <div className="booking-summary-item">
             <span>
-              Consultation Mode
+              {isHindi ? "परामर्श का माध्यम" : "Consultation Mode"}
             </span>
 
-            <strong>
-              {formattedMode}
-            </strong>
+            <strong>{formattedMode}</strong>
           </div>
 
           <div className="booking-summary-item">
             <span>
-              Consultant
+              {isHindi ? "ज्योतिष सलाहकार" : "Consultant"}
             </span>
 
             <strong>
               {booking.consultantName ||
-                "Consultant assigned"}
+                (isHindi ? "निर्धारित किया जाएगा" : "To be assigned")}
             </strong>
           </div>
 
           <div className="booking-summary-item">
             <span>
-              Date
+              {isHindi ? "तारीख" : "Date"}
             </span>
 
-            <strong>
-              {formattedDate}
-            </strong>
+            <strong>{formattedDate}</strong>
           </div>
 
           <div className="booking-summary-item">
             <span>
-              Time
+              {isHindi ? "समय (IST)" : "Time (IST)"}
             </span>
 
-            <strong>
-              {booking.time}
-            </strong>
+            <strong>{booking.time}</strong>
           </div>
-
         </div>
 
         <div className="booking-summary-divider" />
 
-        {/* ================================
-            CUSTOMER
-        ================================= */}
-
         <div className="booking-summary-section">
-
           <p className="booking-summary-label">
-            Customer
+            {isHindi ? "ग्राहक" : "Customer"}
           </p>
 
           <div className="booking-summary-customer">
-
             <strong>
               {booking.customer.fullName}
             </strong>
 
-            <span>
-              {booking.customer.mobile}
-            </span>
-
-            <span>
-              {booking.customer.email}
-            </span>
-
+            <span>{booking.customer.mobile}</span>
+            <span>{booking.customer.email}</span>
           </div>
-
         </div>
 
         <div className="booking-summary-divider" />
 
-        {/* ================================
-            PAYMENT
-        ================================= */}
-
         <div className="booking-summary-price">
-
           <span>
-            Total Consultation Fee
+            {isHindi ? "भुगतान योग्य राशि" : "Amount Payable"}
           </span>
 
           <strong>
-            {formattedPrice}
+            {booking.currency === "INR" ? "₹" : `${booking.currency} `}
+            {amount.toLocaleString(
+              language === "hi" ? "hi-IN" : "en-IN"
+            )}
           </strong>
-
         </div>
 
-        {/* ================================
-            PAYMENT NOTE
-        ================================= */}
+        <div className="booking-summary-divider" />
 
-        <p
-          className="section-description"
-          style={{
-            marginTop: "16px",
-            marginBottom: "0",
-          }}
-        >
-          You will be securely redirected to
-          Razorpay to complete your payment.
-        </p>
-
-        {/* ================================
-            ACTION
-        ================================= */}
-
-        <div className="booking-summary-action">
+        <div className="booking-summary-actions">
+          <p className="booking-form-help">
+            {isHindi
+              ? "आगे बढ़ने पर आप सुरक्षित भुगतान प्रक्रिया पर जाएँगे।"
+              : "You will be taken to the secure payment process when you continue."}
+          </p>
 
           <button
             type="button"
             className="btn btn-primary"
-            onClick={onProceedToPayment}
-            disabled={booking.price <= 0}
+            onClick={handleProceedToPayment}
+            disabled={paymentStarting}
+            aria-busy={paymentStarting}
           >
-            {booking.price > 0
-              ? `Confirm & Pay ${formattedPrice} →`
-              : "Payment Amount Unavailable"}
+            {paymentStarting
+              ? isHindi
+                ? "भुगतान तैयार हो रहा है..."
+                : "Preparing Payment..."
+              : isHindi
+                ? "सुरक्षित भुगतान पर जाएँ →"
+                : "Proceed to Secure Payment →"}
           </button>
-
         </div>
-
       </div>
     </section>
   );

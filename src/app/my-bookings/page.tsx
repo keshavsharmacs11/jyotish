@@ -6,7 +6,6 @@ import {
 } from "react";
 
 import PageHero from "@/components/shared/PageHero";
-import Footer from "@/components/layout/Footer";
 
 type Booking = {
   _id: string;
@@ -562,7 +561,6 @@ export default function MyBookingsPage() {
         </div>
       </section>
 
-      <Footer />
     </>
   );
 }

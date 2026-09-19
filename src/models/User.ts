@@ -14,6 +14,10 @@ export interface IUser extends Document {
   phone?: string;
   passwordHash: string;
   role: UserRole;
+  isSuperAdmin?: boolean;
+  active?: boolean;
+  /** True only for admins who completed an administrator invitation. */
+  consultantProfileEligible?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -58,6 +62,40 @@ const UserSchema =
         type: String,
         enum: ["customer", "admin"],
         default: "customer",
+      },
+
+      /*
+       * Identifies accounts with Super Administrator
+       * privileges when explicitly enabled.
+       */
+      isSuperAdmin: {
+        type: Boolean,
+        default: false,
+      },
+
+      /*
+       * Controls whether an account is currently
+       * allowed to access the system.
+       *
+       * Existing accounts without this field are
+       * treated as active by the authentication logic.
+       */
+      active: {
+        type: Boolean,
+        default: true,
+      },
+
+      /**
+       * Only administrator accounts activated through the
+       * administrator invitation flow can create their own
+       * linked consultant profile.
+       *
+       * Existing/manual admin accounts remain false unless
+       * explicitly migrated server-side.
+       */
+      consultantProfileEligible: {
+        type: Boolean,
+        default: false,
       },
     },
     {

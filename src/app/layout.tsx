@@ -6,6 +6,7 @@ import {
 
 import ScrollToTop from "@/components/utils/ScrollToTop";
 import SiteChrome from "@/components/layout/SiteChrome";
+import { LanguageProvider } from "@/context/LanguageContext";
 
 import "./globals.css";
 
@@ -35,15 +36,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       <body
         className={`${headingFont.variable} ${bodyFont.variable}`}
       >
-        <ScrollToTop />
+        <LanguageProvider>
+          <ScrollToTop />
 
-        <SiteChrome>
-          {children}
-        </SiteChrome>
+          <SiteChrome>
+            {children}
+          </SiteChrome>
+        </LanguageProvider>
       </body>
     </html>
   );

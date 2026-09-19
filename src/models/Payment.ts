@@ -39,6 +39,30 @@ export interface IPayment extends Document {
 
   refundReason?: string;
 
+  /*
+   * ============================================
+   * BOOKING EMAIL DELIVERY
+   * ============================================
+   */
+
+  customerConfirmationEmailSentAt?: Date | null;
+
+  adminBookingEmailSentAt?: Date | null;
+
+  /*
+   * ============================================
+   * REFUND EMAIL DELIVERY
+   * ============================================
+   *
+   * Stores when the customer refund email was
+   * successfully accepted by Resend.
+   *
+   * This prevents duplicate refund emails when
+   * the admin endpoint is called again.
+   */
+
+  customerRefundEmailSentAt?: Date | null;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -123,18 +147,6 @@ const PaymentSchema =
        * ==========================================
        * REFUND STATUS
        * ==========================================
-       *
-       * none
-       *   No refund has been requested.
-       *
-       * pending
-       *   Refund request has been sent.
-       *
-       * processed
-       *   Razorpay refund was successfully created.
-       *
-       * failed
-       *   Refund request failed.
        */
 
       refundStatus: {
@@ -170,6 +182,39 @@ const PaymentSchema =
       refundReason: {
         type: String,
         default: "",
+      },
+
+      /*
+       * ==========================================
+       * CUSTOMER BOOKING CONFIRMATION EMAIL
+       * ==========================================
+       */
+
+      customerConfirmationEmailSentAt: {
+        type: Date,
+        default: null,
+      },
+
+      /*
+       * ==========================================
+       * ADMIN BOOKING EMAIL
+       * ==========================================
+       */
+
+      adminBookingEmailSentAt: {
+        type: Date,
+        default: null,
+      },
+
+      /*
+       * ==========================================
+       * CUSTOMER REFUND EMAIL
+       * ==========================================
+       */
+
+      customerRefundEmailSentAt: {
+        type: Date,
+        default: null,
       },
     },
     {

@@ -1,8 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { ReactNode, useState } from "react";
+import {
+  usePathname,
+  useRouter,
+} from "next/navigation";
+import {
+  ReactNode,
+  useState,
+} from "react";
 
 interface AdminShellProps {
   children: ReactNode;
@@ -29,7 +35,75 @@ const navigation = [
     href: "/admin/consultants",
     icon: "♙",
   },
+  {
+    label: "Queries",
+    href: "/admin/queries",
+    icon: "✉",
+  },
+  {
+    label: "Feedback",
+    href: "/admin/feedback",
+    icon: "☆",
+  },
 ];
+
+function getPageTitle(
+  pathname: string
+): string {
+  if (pathname === "/admin") {
+    return "Dashboard";
+  }
+
+  if (
+    pathname.startsWith(
+      "/admin/bookings"
+    )
+  ) {
+    return "Bookings";
+  }
+
+  if (
+    pathname.startsWith(
+      "/admin/services"
+    )
+  ) {
+    return "Services";
+  }
+
+  if (
+    pathname.startsWith(
+      "/admin/consultants"
+    )
+  ) {
+    return "Consultants";
+  }
+
+  if (
+    pathname.startsWith(
+      "/admin/queries"
+    )
+  ) {
+    return "Queries";
+  }
+
+  if (
+    pathname.startsWith(
+      "/admin/feedback"
+    )
+  ) {
+    return "Feedback";
+  }
+
+  if (
+    pathname.startsWith(
+      "/admin/settings"
+    )
+  ) {
+    return "Settings";
+  }
+
+  return "Dashboard";
+}
 
 export default function AdminShell({
   children,
@@ -44,36 +118,83 @@ export default function AdminShell({
     useState(false);
 
   /*
-   * Login page must NOT receive the
-   * admin sidebar.
+   * ============================================
+   * LOGIN PAGE
+   * ============================================
+   *
+   * Login must not receive the admin shell.
    */
 
-  if (pathname === "/admin/login") {
+  if (
+    pathname === "/admin/login" ||
+    pathname === "/admin/activate" ||
+    pathname === "/admin/forgot-password" ||
+    pathname === "/admin/reset-password"
+  ) {
     return <>{children}</>;
   }
 
+  /*
+   * ============================================
+   * CURRENT PAGE TITLE
+   * ============================================
+   */
+
+  const pageTitle =
+    getPageTitle(pathname);
+
+  /*
+   * ============================================
+   * ADMIN LOGOUT
+   * ============================================
+   */
+
   const handleLogout = async () => {
-    if (loggingOut) return;
+    if (loggingOut) {
+      return;
+    }
 
     setLoggingOut(true);
 
     try {
-      await fetch("/api/admin/logout", {
-        method: "POST",
-      });
+      const response =
+        await fetch(
+          "/api/admin/logout",
+          {
+            method: "POST",
+            credentials:
+              "include",
+          }
+        );
+
+      if (!response.ok) {
+        console.error(
+          "Admin logout request failed."
+        );
+      }
     } catch (error) {
       console.error(
         "Admin logout error:",
         error
       );
     } finally {
-      router.push("/admin/login");
+      /*
+       * Replace prevents the user from
+       * navigating back into the previous
+       * admin page using browser history.
+       */
+
+      router.replace(
+        "/admin/login"
+      );
+
       router.refresh();
     }
   };
 
   return (
     <div className="admin-shell">
+
       {/* ======================================
           MOBILE OVERLAY
       ====================================== */}
@@ -100,14 +221,17 @@ export default function AdminShell({
             : ""
         }`}
       >
-        {/* Brand */}
+
+        {/* BRAND */}
 
         <div className="admin-sidebar-brand">
+
           <div className="admin-brand-symbol">
             ✦
           </div>
 
           <div>
+
             <div className="admin-brand-name">
               AKSHAANSHH
             </div>
@@ -115,57 +239,79 @@ export default function AdminShell({
             <div className="admin-brand-subtitle">
               JYOTISH
             </div>
+
           </div>
+
         </div>
 
-        {/* Navigation */}
+        {/* NAVIGATION */}
 
         <div className="admin-sidebar-section">
+
           <div className="admin-sidebar-label">
             MAIN
           </div>
 
           <nav className="admin-sidebar-nav">
-            {navigation.map((item) => {
-              const active =
-                item.href === "/admin"
-                  ? pathname === "/admin"
-                  : pathname.startsWith(
+
+            {navigation.map(
+              (item) => {
+
+                const active =
+                  item.href ===
+                  "/admin"
+                    ? pathname ===
+                      "/admin"
+                    : pathname.startsWith(
+                        item.href
+                      );
+
+                return (
+                  <Link
+                    key={
                       item.href
-                    );
+                    }
+                    href={
+                      item.href
+                    }
+                    className={`admin-nav-item ${
+                      active
+                        ? "admin-nav-item-active"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      setMobileOpen(
+                        false
+                      )
+                    }
+                  >
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`admin-nav-item ${
-                    active
-                      ? "admin-nav-item-active"
-                      : ""
-                  }`}
-                  onClick={() =>
-                    setMobileOpen(false)
-                  }
-                >
-                  <span className="admin-nav-icon">
-                    {item.icon}
-                  </span>
+                    <span className="admin-nav-icon">
+                      {item.icon}
+                    </span>
 
-                  <span>
-                    {item.label}
-                  </span>
-                </Link>
-              );
-            })}
+                    <span>
+                      {item.label}
+                    </span>
+
+                  </Link>
+                );
+              }
+            )}
+
           </nav>
+
         </div>
 
-        {/* Bottom */}
+        {/* SYSTEM */}
 
         <div className="admin-sidebar-bottom">
+
           <div className="admin-sidebar-label">
             SYSTEM
           </div>
+
+          {/* SETTINGS */}
 
           <Link
             href="/admin/settings"
@@ -177,22 +323,35 @@ export default function AdminShell({
                 : ""
             }`}
             onClick={() =>
-              setMobileOpen(false)
+              setMobileOpen(
+                false
+              )
             }
           >
+
             <span className="admin-nav-icon">
               ⚙
             </span>
 
-            <span>Settings</span>
+            <span>
+              Settings
+            </span>
+
           </Link>
+
+          {/* SIGN OUT */}
 
           <button
             type="button"
             className="admin-nav-item admin-signout"
-            onClick={handleLogout}
-            disabled={loggingOut}
+            onClick={
+              handleLogout
+            }
+            disabled={
+              loggingOut
+            }
           >
+
             <span className="admin-nav-icon">
               ↪
             </span>
@@ -202,8 +361,11 @@ export default function AdminShell({
                 ? "Signing Out..."
                 : "Sign Out"}
             </span>
+
           </button>
+
         </div>
+
       </aside>
 
       {/* ======================================
@@ -211,15 +373,22 @@ export default function AdminShell({
       ====================================== */}
 
       <div className="admin-main">
-        {/* Header */}
+
+        {/* ====================================
+            TOPBAR
+        ==================================== */}
 
         <header className="admin-topbar">
+
           <div className="admin-topbar-left">
+
             <button
               type="button"
               className="admin-mobile-menu"
               onClick={() =>
-                setMobileOpen(true)
+                setMobileOpen(
+                  true
+                )
               }
               aria-label="Open navigation"
             >
@@ -227,23 +396,33 @@ export default function AdminShell({
             </button>
 
             <div>
+
               <div className="admin-topbar-eyebrow">
                 ADMINISTRATION
               </div>
 
               <div className="admin-topbar-title">
-                Akshaanshh Jyotish
+                {pageTitle}
               </div>
+
             </div>
+
           </div>
 
+          {/* ==================================
+              RIGHT SIDE
+          ================================== */}
+
           <div className="admin-topbar-right">
+
             <div className="admin-system-status">
+
               <span className="admin-status-dot" />
 
               <span>
                 System Online
               </span>
+
             </div>
 
             <div
@@ -252,15 +431,21 @@ export default function AdminShell({
             >
               A
             </div>
+
           </div>
+
         </header>
 
-        {/* Page */}
+        {/* ====================================
+            PAGE CONTENT
+        ==================================== */}
 
         <main className="admin-content">
           {children}
         </main>
+
       </div>
+
     </div>
   );
 }

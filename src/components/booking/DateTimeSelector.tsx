@@ -1,407 +1,728 @@
-"use client";
+ "use client";
 
-type Availability = {
+import { useEffect, useMemo, useState } from "react";
+
+import { useLanguage } from "@/context/LanguageContext";
+import { isSlotInFutureIST } from "@/lib/bookingTime";
+
+type AppointmentSlot = {
   date: string;
-  times: string[];
+  startTime: string;
+  endTime: string;
 };
+
+type BookingMode = "video" | "voice";
 
 type DateTimeSelectorProps = {
-  availability: Availability[];
+  availability: AppointmentSlot[];
   selectedDate: string | null;
   selectedTime: string | null;
+  serviceDuration?: number;
+  mode?: BookingMode | null;
   onDateSelect: (date: string) => void;
   onTimeSelect: (time: string) => void;
+  /** Dates containing occupied consultant periods (bookings/holds). */
+  occupiedDates?: string[];
 };
+
+type TimeGroup = "Morning" | "Afternoon" | "Evening";
+
+const TIME_GROUPS: TimeGroup[] = [
+  "Morning",
+  "Afternoon",
+  "Evening",
+];
+
+function daysInMonth(year: number, month: number): number {
+  if (month === 2) {
+    return year % 400 === 0 || (year % 4 === 0 && year % 100 !== 0)
+      ? 29
+      : 28;
+  }
+
+  return [4, 6, 9, 11].includes(month) ? 30 : 31;
+}
+
+function isValidDateKey(date: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const year = Number(date.slice(0, 4));
+  const month = Number(date.slice(5, 7));
+  const day = Number(date.slice(8, 10));
+  return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth(year, month);
+}
+
+function parseDateKey(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 12));
+}
+
+function dateKey(date: Date) {
+  return `${date.getUTCFullYear()}-${String(
+    date.getUTCMonth() + 1
+  ).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+function formatDate(date: string, language: "en" | "hi" = "en") {
+  const value = parseDateKey(date);
+
+  return new Intl.DateTimeFormat(
+    language === "hi" ? "hi-IN" : "en-IN",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "Asia/Kolkata",
+    }
+  ).format(value);
+}
+
+function formatTime(time: string) {
+  const match = /^(\d{2}):(\d{2})$/.exec(time);
+
+  if (!match) {
+    return time;
+  }
+
+  const hour = Number(match[1]);
+  const suffix = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 || 12;
+
+  return `${hour12}:${match[2]} ${suffix}`;
+}
+
+function timeOfDay(time: string): TimeGroup {
+  const hour = Number(time.slice(0, 2));
+
+  if (hour < 12) {
+    return "Morning";
+  }
+
+  if (hour < 17) {
+    return "Afternoon";
+  }
+
+  return "Evening";
+}
+
+function monthLabel(date: Date, language: "en" | "hi" = "en") {
+  return new Intl.DateTimeFormat(
+    language === "hi" ? "hi-IN" : "en-IN",
+    {
+      month: "long",
+      year: "numeric",
+      timeZone: "Asia/Kolkata",
+    }
+  ).format(date);
+}
+
+function addMonths(date: Date, amount: number) {
+  return new Date(
+    Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth() + amount,
+      1
+    )
+  );
+}
+
+function sameMonth(a: Date, b: Date) {
+  return (
+    a.getUTCFullYear() === b.getUTCFullYear() &&
+    a.getUTCMonth() === b.getUTCMonth()
+  );
+}
+
+function todayDateKey() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+
+  const values: Record<string, string> = {};
+
+  for (const part of parts) {
+    if (part.type !== "literal") {
+      values[part.type] = part.value;
+    }
+  }
+
+  return `${values.year}-${values.month}-${values.day}`;
+}
 
 export default function DateTimeSelector({
   availability,
   selectedDate,
   selectedTime,
+  serviceDuration = 30,
+  mode,
   onDateSelect,
   onTimeSelect,
+  occupiedDates = [],
 }: DateTimeSelectorProps) {
-  /*
-   * ============================================
-   * TODAY
-   * ============================================
-   *
-   * Use the browser's local date rather than
-   * UTC so the date behaves correctly for users
-   * in India and other time zones.
-   */
-
-  const now = new Date();
-
-  const today = [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-  ].join("-");
+  const { language } = useLanguage();
+  const isHindi = language === "hi";
 
   /*
-   * ============================================
-   * NORMALIZE AVAILABILITY
-   * ============================================
-   *
-   * Availability now comes from consultants.
-   *
-   * The page.tsx combines the availability of
-   * all eligible consultants before sending it
-   * here.
-   *
-   * Example:
-   *
-   * Consultant A:
-   * 2026-08-17 -> 10:00, 11:00
-   *
-   * Consultant B:
-   * 2026-08-17 -> 12:00
-   *
-   * This component receives:
-   *
-   * 2026-08-17 -> 10:00, 11:00, 12:00
-   *
-   * We still normalize it here so duplicate
-   * dates/times cannot accidentally appear.
+   * Keep presentation-level filtering current even if the parent has not
+   * refreshed its consultant feed yet. The shared helper remains the single
+   * IST comparison rule.
    */
-
-  const normalizedAvailability =
-    availability
-      .filter(
-        (item) =>
-          item &&
-          item.date &&
-          Array.isArray(item.times)
-      )
-      .map((item) => ({
-        date: item.date,
-        times: Array.from(
-          new Set(
-            item.times
-              .filter(Boolean)
-              .map((time) => String(time))
-          )
-        ).sort(),
-      }))
-      .filter(
-        (item) =>
-          item.times.length > 0
-      );
+  const [bookingClockTick, setBookingClockTick] = useState(0);
 
   /*
-   * ============================================
-   * AVAILABLE DATES
-   * ============================================
-   *
-   * Only show:
-   *
-   * - Today or future dates
-   * - Dates with at least one time slot
+   * Refresh the local presentation every 15 seconds so a slot that passes
+   * while the user is on the booking screen disappears without navigation.
    */
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setBookingClockTick((value) => value + 1);
+    }, 15_000);
 
-  const availableDates =
-    normalizedAvailability
-      .filter(
-        (item) =>
-          item.date >= today &&
-          item.times.length > 0
-      )
-      .sort((a, b) =>
-        a.date.localeCompare(b.date)
-      );
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   /*
-   * ============================================
-   * SELECTED DATE
-   * ============================================
+   * The API remains the source of truth for availability.
+   * We only normalize the values for presentation, while defensively
+   * removing any slot whose start minute has already passed in IST.
    */
+  const normalizedAvailability = useMemo(() => {
+    const byDate = new Map<string, AppointmentSlot[]>();
 
-  const selectedAvailability =
-    availableDates.find(
-      (item) =>
-        item.date === selectedDate
-    );
+    for (const slot of availability ?? []) {
+      const date = String(slot?.date ?? "").trim();
+      const startTime = String(slot?.startTime ?? "").trim();
+      const endTime = String(slot?.endTime ?? "").trim();
 
-  /*
-   * ============================================
-   * FORMAT DATE
-   * ============================================
-   */
-
-  function formatDate(
-    date: string
-  ) {
-    return new Date(
-      `${date}T00:00:00`
-    ).toLocaleDateString(
-      "en-IN",
-      {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
+      if (
+        !isValidDateKey(date) ||
+        !/^\d{2}:\d{2}$/.test(startTime) ||
+        !/^\d{2}:\d{2}$/.test(endTime)
+      ) {
+        continue;
       }
-    );
-  }
 
-  /*
-   * ============================================
-   * FORMAT SHORT DATE
-   * ============================================
-   */
-
-  function formatShortDate(
-    date: string
-  ) {
-    return new Date(
-      `${date}T00:00:00`
-    ).toLocaleDateString(
-      "en-IN",
-      {
-        day: "numeric",
-        month: "short",
+      if (!isSlotInFutureIST(date, startTime)) {
+        continue;
       }
+
+      const current = byDate.get(date) ?? [];
+      current.push({
+        date,
+        startTime,
+        endTime,
+      });
+      byDate.set(date, current);
+    }
+
+    return Array.from(byDate.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, slots]) => ({
+        date,
+        slots: slots.sort((a, b) =>
+          a.startTime.localeCompare(b.startTime)
+        ),
+      }));
+  }, [availability, bookingClockTick]);
+
+  const availableDates = useMemo(
+    () => normalizedAvailability.map((item) => item.date),
+    [normalizedAvailability]
+  );
+
+  const firstAvailableMonth = useMemo(() => {
+    const first = availableDates[0];
+
+    if (!first) {
+      return new Date();
+    }
+
+    const value = parseDateKey(first);
+
+    return new Date(
+      Date.UTC(
+        value.getUTCFullYear(),
+        value.getUTCMonth(),
+        1
+      )
     );
-  }
+  }, [availableDates]);
 
-  /*
-   * ============================================
-   * DATE CHANGE
-   * ============================================
-   *
-   * Selecting a different date should always
-   * clear the previously selected time.
-   *
-   * The parent page already handles this too,
-   * but we deliberately keep the component
-   * responsible for selecting only a date here.
-   */
+  const lastAvailableMonth = useMemo(() => {
+    const last = availableDates[availableDates.length - 1];
 
-  function handleDateSelect(
-    date: string
-  ) {
-    onDateSelect(date);
-  }
+    if (!last) {
+      return new Date();
+    }
 
-  /*
-   * ============================================
-   * TIME CHANGE
-   * ============================================
-   */
+    const value = parseDateKey(last);
 
-  function handleTimeSelect(
-    time: string
-  ) {
-    if (!selectedDate) {
+    return new Date(
+      Date.UTC(
+        value.getUTCFullYear(),
+        value.getUTCMonth(),
+        1
+      )
+    );
+  }, [availableDates]);
+
+  const [visibleMonth, setVisibleMonth] =
+    useState<Date | null>(null);
+
+  const calendarMonth =
+    visibleMonth ?? firstAvailableMonth;
+
+  const availableDateSet = useMemo(
+    () => new Set(availableDates),
+    [availableDates]
+  );
+
+  const occupiedDateSet = useMemo(
+    () =>
+      new Set(
+        (occupiedDates ?? [])
+          .map((date) => String(date).trim())
+          .filter(Boolean),
+      ),
+    [occupiedDates],
+  );
+
+  const slotCountByDate = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const item of normalizedAvailability) {
+      counts.set(item.date, item.slots.length);
+    }
+
+    return counts;
+  }, [normalizedAvailability]);
+
+  const selectedSlots = useMemo(
+    () =>
+      normalizedAvailability.find(
+        (item) => item.date === selectedDate
+      )?.slots ?? [],
+    [normalizedAvailability, selectedDate]
+  );
+
+  const groupedSlots = useMemo(() => {
+    const groups: Record<TimeGroup, AppointmentSlot[]> = {
+      Morning: [],
+      Afternoon: [],
+      Evening: [],
+    };
+
+    for (const slot of selectedSlots) {
+      groups[timeOfDay(slot.startTime)].push(slot);
+    }
+
+    return groups;
+  }, [selectedSlots]);
+
+  const calendarDays = useMemo(() => {
+    const year = calendarMonth.getUTCFullYear();
+    const month = calendarMonth.getUTCMonth();
+
+    const firstDay = new Date(Date.UTC(year, month, 1));
+    const daysInMonth = new Date(
+      Date.UTC(year, month + 1, 0)
+    ).getUTCDate();
+
+    // Monday-first calendar, matching the booking UI.
+    const leadingEmptyDays =
+      (firstDay.getUTCDay() + 6) % 7;
+
+    const cells: Array<Date | null> = [];
+
+    for (let i = 0; i < leadingEmptyDays; i += 1) {
+      cells.push(null);
+    }
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      cells.push(new Date(Date.UTC(year, month, day)));
+    }
+
+    while (cells.length % 7 !== 0) {
+      cells.push(null);
+    }
+
+    return cells;
+  }, [calendarMonth]);
+
+  const availableDaysInVisibleMonth = useMemo(
+    () =>
+      availableDates.filter((date) =>
+        sameMonth(parseDateKey(date), calendarMonth)
+      ).length,
+    [availableDates, calendarMonth]
+  );
+
+  const todayKey = todayDateKey();
+
+  const canGoPrevious = !sameMonth(
+    calendarMonth,
+    firstAvailableMonth
+  );
+
+  const canGoNext = !sameMonth(
+    calendarMonth,
+    lastAvailableMonth
+  );
+
+  const selectDate = (date: string) => {
+    if (!availableDateSet.has(date)) {
       return;
     }
 
-    onTimeSelect(time);
-  }
-
-  /*
-   * ============================================
-   * NO AVAILABILITY
-   * ============================================
-   */
+    onDateSelect(date);
+  };
 
   if (availableDates.length === 0) {
     return (
-      <div className="booking-step">
-
-        <div className="booking-header">
-          <p className="eyebrow">
-            STEP 3
-          </p>
-
-          <h2 className="section-heading">
-            Choose Date & Time
-          </h2>
-
-          <p className="section-description">
-            No consultation slots are
-            currently available.
-          </p>
-        </div>
-
-        <div className="booking-date-empty">
-
-          <div className="booking-date-empty-icon">
-            ○
+      <div
+        className="booking-date-time-card"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="booking-date-time-empty">
+          <div className="booking-calendar-empty-mark" aria-hidden="true">
+            <span />
+            <span />
+            <span />
           </div>
-
-          <h3>
-            No available dates
-          </h3>
-
-          <p>
-            There are currently no
-            available consultation
-            dates for this selection.
-            Please check again later.
-          </p>
-
+          <div>
+            <h3>{isHindi ? "कोई उपलब्ध तारीख नहीं" : "No available dates"}</h3>
+            <p>
+              {isHindi
+                ? "इस चयन के लिए अभी कोई अपॉइंटमेंट समय उपलब्ध नहीं है।"
+                : "No appointment times are available for this selection right now."}
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
-  /*
-   * ============================================
-   * UI
-   * ============================================
-   */
-
   return (
-    <div className="booking-step">
-
-      {/* ======================================
-          DATE
-      ====================================== */}
-
-      <div className="booking-header">
-
-        <p className="eyebrow">
-          STEP 3
+    <div className="booking-date-time-card">
+      <div className="booking-date-time-intro">
+        <p className="eyebrow">{isHindi ? "तारीख और समय" : "DATE &amp; TIME"}</p>
+        <h2>{isHindi ? "अपनी तारीख और समय चुनें" : "Choose your date and time"}</h2>
+        <p>
+          {isHindi
+            ? "सत्र की अवधि "
+            : "Sessions are "}
+          <strong>
+            {serviceDuration} {isHindi ? "मिनट" : "minutes"}
+          </strong>
+          {mode
+            ? ` · ${
+                mode === "video"
+                  ? isHindi
+                    ? "वीडियो"
+                    : "Video"
+                  : isHindi
+                  ? "वॉइस"
+                  : "Voice"
+              }`
+            : ""}{" "}
+          · {isHindi
+            ? "सभी समय भारतीय मानक समय के अनुसार दिखाए गए हैं।"
+            : "All times are shown in India Standard Time."}
         </p>
-
-        <h2 className="section-heading">
-          Choose a Date
-        </h2>
-
-        <p className="section-description">
-          Select a date when a consultant
-          is available.
-        </p>
-
       </div>
 
-      {/* ======================================
-          AVAILABLE DATE LIST
-      ====================================== */}
+      <div className="booking-calendar-block">
+        <div className="booking-calendar-header">
+          <button
+            type="button"
+            className="booking-calendar-nav"
+            onClick={() =>
+              setVisibleMonth(
+                addMonths(calendarMonth, -1)
+              )
+            }
+            disabled={!canGoPrevious}
+            aria-label={isHindi ? "पिछला उपलब्ध महीना" : "Previous available month"}
+          >
+            <span aria-hidden="true">‹</span>
+          </button>
 
-      <div className="booking-date-list">
-
-        {availableDates.map(
-          (item) => (
-            <button
-              key={item.date}
-              type="button"
-              className={`booking-date-option ${
-                selectedDate === item.date
-                  ? "booking-date-option-selected"
-                  : ""
-              }`}
-              onClick={() =>
-                handleDateSelect(
-                  item.date
-                )
-              }
-            >
-
-              <span className="booking-date-option-day">
-                {formatShortDate(
-                  item.date
-                )}
-              </span>
-
-              <span className="booking-date-option-full">
-                {formatDate(
-                  item.date
-                )}
-              </span>
-
-              <span className="booking-date-option-slots">
-                {item.times.length}{" "}
-                {item.times.length === 1
-                  ? "slot"
-                  : "slots"}{" "}
-                available
-              </span>
-
-            </button>
-          )
-        )}
-
-      </div>
-
-      {/* ======================================
-          TIME
-      ====================================== */}
-
-      {selectedDate &&
-        selectedAvailability && (
-          <div className="booking-time-section">
-
-            <div className="booking-header">
-
-              <p className="eyebrow">
-                STEP 4
-              </p>
-
-              <h2 className="section-heading">
-                Choose a Time
-              </h2>
-
-              <p className="section-description">
-                Select an available time
-                slot for{" "}
-                <strong>
-                  {formatDate(
-                    selectedDate
-                  )}
-                </strong>
-                .
-              </p>
-
-            </div>
-
-            {/* ==============================
-                TIME SLOTS
-            ============================== */}
-
-            <div className="booking-time-list">
-
-              {selectedAvailability.times
-                .slice()
-                .sort()
-                .map(
-                  (time) => (
-                    <button
-                      key={time}
-                      type="button"
-                      className={`booking-time-option ${
-                        selectedTime === time
-                          ? "booking-time-option-selected"
-                          : ""
-                      }`}
-                      onClick={() =>
-                        handleTimeSelect(
-                          time
-                        )
-                      }
-                    >
-
-                      <span>
-                        {time}
-                      </span>
-
-                      {selectedTime ===
-                        time && (
-                        <span>
-                          ✓
-                        </span>
-                      )}
-
-                    </button>
-                  )
-                )}
-
-            </div>
-
+          <div className="booking-calendar-month">
+            <span className="booking-calendar-month-eyebrow">
+              {isHindi ? "उपलब्ध तारीखें" : "AVAILABLE DATES"}
+            </span>
+            <strong>{monthLabel(calendarMonth, language)}</strong>
+            <span>
+              {availableDaysInVisibleMonth}{" "}
+              {isHindi
+                ? availableDaysInVisibleMonth === 1
+                  ? "उपलब्ध दिन"
+                  : "उपलब्ध दिन"
+                : availableDaysInVisibleMonth === 1
+                ? "available day"
+                : "available days"}{" "}
+              {isHindi ? "इस महीने" : "this month"}
+            </span>
           </div>
-        )}
 
+          <button
+            type="button"
+            className="booking-calendar-nav"
+            onClick={() =>
+              setVisibleMonth(
+                addMonths(calendarMonth, 1)
+              )
+            }
+            disabled={!canGoNext}
+            aria-label={isHindi ? "अगला उपलब्ध महीना" : "Next available month"}
+          >
+            <span aria-hidden="true">›</span>
+          </button>
+        </div>
+
+        <div
+          className="booking-calendar-weekdays"
+          aria-hidden="true"
+        >
+          {(isHindi
+            ? ["सोम", "मंगल", "बुध", "गुरु", "शुक्र", "शनि", "रवि"]
+            : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+          ).map((day) => (
+            <span key={day}>{day}</span>
+          ))}
+        </div>
+
+        <div
+          className="booking-calendar-grid"
+          role="grid"
+          aria-label={isHindi ? `${monthLabel(calendarMonth, language)} कैलेंडर` : `${monthLabel(calendarMonth, language)} calendar`}
+        >
+          {calendarDays.map((date, index) => {
+            if (!date) {
+              return (
+                <div
+                  key={`empty-${index}`}
+                  className="booking-calendar-day is-empty"
+                  aria-hidden="true"
+                />
+              );
+            }
+
+            const key = dateKey(date);
+            const isAvailable =
+              availableDateSet.has(key);
+            const isOccupied =
+              occupiedDateSet.has(key);
+            const isSelected = selectedDate === key;
+            const count =
+              slotCountByDate.get(key) ?? 0;
+            const isToday = todayKey === key;
+
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`booking-calendar-day ${
+                  isAvailable
+                    ? "is-available"
+                    : "is-unavailable"
+                } ${
+                  isOccupied ? "has-booking" : ""
+                } ${
+                  isSelected ? "is-selected" : ""
+                } ${isToday ? "is-today" : ""}`}
+                disabled={!isAvailable}
+                onClick={() => selectDate(key)}
+                role="gridcell"
+                aria-selected={isSelected}
+                aria-label={
+                  isAvailable
+                    ? isHindi
+                      ? `${formatDate(key, language)}, ${count} ${
+                          count === 1 ? "समय उपलब्ध" : "समय उपलब्ध"
+                        }${isOccupied ? ", कुछ समय पहले से बुक हैं" : ""}`
+                      : `${formatDate(key, language)}, ${count} available ${
+                          count === 1 ? "slot" : "slots"
+                        }${isOccupied ? ", some periods are already occupied" : ""}`
+                    : isOccupied
+                    ? isHindi
+                      ? `${formatDate(key, language)}, वर्तमान में बुक`
+                      : `${formatDate(key, language)}, currently occupied`
+                    : isHindi
+                    ? `${formatDate(key, language)}, उपलब्ध नहीं`
+                    : `${formatDate(key, language)}, unavailable`
+                }
+              >
+                <span className="booking-calendar-day-number">
+                  {date.getUTCDate()}
+                </span>
+
+                {isToday && (
+                  <span className="booking-calendar-today-label">
+                    {isHindi ? "आज" : "Today"}
+                  </span>
+                )}
+
+                {(isAvailable || isOccupied) && (
+                  <span
+                    className="booking-calendar-day-dot"
+                    aria-hidden="true"
+                  >
+                    {isAvailable && <i className="is-available" />}
+                    {isOccupied && <i className="is-booked" />}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div
+          className="booking-calendar-legend"
+          aria-label={isHindi ? "कैलेंडर संकेत" : "Calendar legend"}
+        >
+          <span>
+            <i className="booking-calendar-legend-dot is-available" />
+            {isHindi ? "उपलब्ध" : "Available"}
+          </span>
+
+          <span>
+            <i className="booking-calendar-legend-dot is-selected" />
+            {isHindi ? "चयनित" : "Selected"}
+          </span>
+
+          <span>
+            <i className="booking-calendar-legend-dot is-booked" />
+            {isHindi ? "बुक" : "Occupied"}
+          </span>
+        </div>
+      </div>
+
+      {selectedDate && (
+        <div
+          className="booking-time-picker-block"
+          aria-live="polite"
+        >
+          {selectedSlots.length > 0 ? (
+            <>
+              <div className="booking-date-time-selected-label">
+                <div>
+                  <span className="booking-selected-kicker">
+                    {isHindi ? "चयनित तारीख" : "SELECTED DATE"}
+                  </span>
+                  <strong>
+                    {formatDate(selectedDate, language)}
+                  </strong>
+                </div>
+
+                <span>
+                  {selectedSlots.length}{" "}
+                  {isHindi
+                    ? "समय उपलब्ध"
+                    : selectedSlots.length === 1
+                    ? "available time"
+                    : "available times"}
+                </span>
+              </div>
+
+              {TIME_GROUPS.map((group) => {
+                const slots = groupedSlots[group];
+
+                if (slots.length === 0) {
+                  return null;
+                }
+
+                return (
+                  <section
+                    key={group}
+                    className="booking-time-group"
+                    aria-labelledby={`booking-time-${group.toLowerCase()}`}
+                  >
+                    <h3
+                      id={`booking-time-${group.toLowerCase()}`}
+                    >
+                      {isHindi
+                        ? group === "Morning"
+                          ? "सुबह"
+                          : group === "Afternoon"
+                          ? "दोपहर"
+                          : "शाम"
+                        : group}
+                    </h3>
+
+                    <div
+                      className="booking-time-options"
+                      role="list"
+                      aria-label={isHindi ? `${group === "Morning" ? "सुबह" : group === "Afternoon" ? "दोपहर" : "शाम"} के समय` : `${group} time slots`}
+                    >
+                      {slots.map((slot) => {
+                        const selected =
+                          selectedTime ===
+                          slot.startTime;
+
+                        return (
+                          <button
+                            key={`${slot.date}-${slot.startTime}`}
+                            type="button"
+                            className={`booking-time-option ${
+                              selected
+                                ? "is-selected"
+                                : ""
+                            }`}
+                            onClick={() =>
+                              onTimeSelect(
+                                slot.startTime
+                              )
+                            }
+                            aria-pressed={selected}
+                            aria-label={
+                              isHindi
+                                ? `${formatTime(slot.startTime)}, ${serviceDuration} मिनट का अपॉइंटमेंट, जो ${formatTime(slot.endTime)} पर समाप्त होगा`
+                                : `${formatTime(slot.startTime)}, ${serviceDuration} {isHindi ? "मिनट" : "min"}ute appointment ending at ${formatTime(slot.endTime)}`
+                            }
+                          >
+                            <span>
+                              {formatTime(
+                                slot.startTime
+                              )}
+                            </span>
+
+                            <small>
+                              {serviceDuration} {isHindi ? "मिनट" : "min"}
+                            </small>
+
+                            {selected && (
+                              <b aria-hidden="true">
+                                ✓
+                              </b>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
+              })}
+            </>
+          ) : (
+            <div
+              className="booking-date-time-empty"
+              role="status"
+            >
+              <h3>{isHindi ? "इस तारीख को कोई समय उपलब्ध नहीं" : "No times available on this date"}</h3>
+              <p>
+                {isHindi
+                  ? "जारी रखने के लिए कोई दूसरी हाइलाइट की गई तारीख चुनें।"
+                  : "Choose another highlighted date to continue."}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

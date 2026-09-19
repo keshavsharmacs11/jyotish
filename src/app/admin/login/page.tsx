@@ -1,101 +1,129 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import {
+  FormEvent,
+  useState,
+} from "react";
+
+import Link from "next/link";
 
 export default function AdminLoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] =
+    useState("");
 
-  const [showPassword, setShowPassword] =
+  const [password, setPassword] =
+    useState("");
+
+  const [
+    showPassword,
+    setShowPassword,
+  ] = useState(false);
+
+  const [loading, setLoading] =
     useState(false);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] =
+    useState("");
 
-  const handleSubmit = async (
-    event: FormEvent<HTMLFormElement>
-  ) => {
-    event.preventDefault();
+  const handleSubmit =
+    async (
+      event: FormEvent<HTMLFormElement>
+    ) => {
+      event.preventDefault();
 
-    setError("");
-    setLoading(true);
+      setError("");
+      setLoading(true);
 
-    try {
-      const response = await fetch(
-        "/api/admin/login",
-        {
-          method: "POST",
+      try {
+        const response =
+          await fetch(
+            "/api/admin/login",
+            {
+              method: "POST",
 
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
 
-          body: JSON.stringify({
-            email,
-            password,
-          }),
+              body: JSON.stringify({
+                email,
+                password,
+              }),
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+          throw new Error(
+            data.error ||
+              "Unable to login."
+          );
         }
-      );
 
-      const data =
-        await response.json();
+        /*
+         * Server has already created the
+         * HTTP-only admin_token cookie.
+         */
 
-      if (
-        !response.ok ||
-        !data.success
-      ) {
-        throw new Error(
-          data.error ||
-            "Unable to login."
+        window.location.href =
+          "/admin";
+      } catch (error) {
+        console.error(
+          "Admin login error:",
+          error
         );
+
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Unable to login."
+        );
+      } finally {
+        setLoading(false);
       }
-
-      /*
-       * Server has already created the
-       * HTTP-only admin_token cookie.
-       */
-
-      window.location.href =
-        "/admin";
-    } catch (error) {
-      console.error(
-        "Admin login error:",
-        error
-      );
-
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Unable to login."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
   return (
     <main className="admin-login-page">
-      {/* Background decoration */}
+
+      {/* ============================================
+          BACKGROUND DECORATION
+          ============================================ */}
 
       <div
-        className="admin-login-orbit admin-login-orbit-one"
+        className="
+          admin-login-orbit
+          admin-login-orbit-one
+        "
       />
 
       <div
-        className="admin-login-orbit admin-login-orbit-two"
+        className="
+          admin-login-orbit
+          admin-login-orbit-two
+        "
       />
 
       <div className="admin-login-shell">
 
-        {/* Brand */}
+        {/* ============================================
+            BRAND
+            ============================================ */}
 
         <div className="admin-login-brand">
+
           <div className="admin-login-symbol">
             ✦
           </div>
 
           <div>
+
             <div className="admin-login-brand-name">
               AKSHAANSHH
             </div>
@@ -103,14 +131,19 @@ export default function AdminLoginPage() {
             <div className="admin-login-brand-subtitle">
               JYOTISH
             </div>
+
           </div>
+
         </div>
 
-        {/* Login Card */}
+        {/* ============================================
+            LOGIN CARD
+            ============================================ */}
 
         <div className="admin-login-card">
 
           <div className="admin-login-card-header">
+
             <div className="admin-login-eyebrow">
               ADMINISTRATION
             </div>
@@ -123,18 +156,26 @@ export default function AdminLoginPage() {
               Sign in to access your
               administration dashboard.
             </p>
+
           </div>
 
           <div className="admin-login-divider" />
+
+          {/* ============================================
+              LOGIN FORM
+              ============================================ */}
 
           <form
             onSubmit={handleSubmit}
             className="admin-login-form"
           >
 
-            {/* Email */}
+            {/* ========================================
+                EMAIL
+                ======================================== */}
 
             <div className="admin-login-field">
+
               <label htmlFor="email">
                 Email Address
               </label>
@@ -151,17 +192,32 @@ export default function AdminLoginPage() {
                 required
                 autoComplete="email"
                 placeholder="Enter your admin email"
+                disabled={loading}
               />
+
             </div>
 
-            {/* Password */}
+            {/* ========================================
+                PASSWORD
+                ======================================== */}
 
             <div className="admin-login-field">
 
               <div className="admin-login-label-row">
+
                 <label htmlFor="password">
                   Password
                 </label>
+
+                <Link
+                  href="/admin/forgot-password"
+                  className="
+                    admin-login-forgot-password
+                  "
+                >
+                  Forgot password?
+                </Link>
+
               </div>
 
               <div className="admin-password-wrapper">
@@ -182,11 +238,14 @@ export default function AdminLoginPage() {
                   required
                   autoComplete="current-password"
                   placeholder="Enter your password"
+                  disabled={loading}
                 />
 
                 <button
                   type="button"
-                  className="admin-password-toggle"
+                  className="
+                    admin-password-toggle
+                  "
                   onClick={() =>
                     setShowPassword(
                       (previous) =>
@@ -205,28 +264,42 @@ export default function AdminLoginPage() {
                 </button>
 
               </div>
+
             </div>
 
-            {/* Error */}
+            {/* ========================================
+                ERROR
+                ======================================== */}
 
             {error && (
               <div className="admin-login-error">
+
                 <span>!</span>
 
-                <p>{error}</p>
+                <p>
+                  {error}
+                </p>
+
               </div>
             )}
 
-            {/* Submit */}
+            {/* ========================================
+                SUBMIT
+                ======================================== */}
 
             <button
               type="submit"
               className="admin-login-submit"
               disabled={loading}
             >
+
               {loading ? (
                 <>
-                  <span className="admin-login-spinner" />
+                  <span
+                    className="
+                      admin-login-spinner
+                    "
+                  />
 
                   Signing in...
                 </>
@@ -234,36 +307,52 @@ export default function AdminLoginPage() {
                 <>
                   Sign In
 
-                  <span>→</span>
+                  <span>
+                    →
+                  </span>
                 </>
               )}
+
             </button>
 
           </form>
 
-          {/* Security message */}
+          {/* ============================================
+              SECURITY MESSAGE
+              ============================================ */}
 
           <div className="admin-login-security">
-            <span>✦</span>
+
+            <span>
+              ✦
+            </span>
 
             <p>
               Secure administrator access
             </p>
+
           </div>
 
         </div>
 
-        {/* Footer */}
+        {/* ============================================
+            FOOTER
+            ============================================ */}
 
         <div className="admin-login-footer">
 
           <span>
-            © {new Date().getFullYear()}
+            ©{" "}
+            {new Date().getFullYear()}
             {" "}
             Akshaanshh Jyotish
           </span>
 
-          <span className="admin-login-footer-dot">
+          <span
+            className="
+              admin-login-footer-dot
+            "
+          >
             •
           </span>
 
@@ -274,6 +363,7 @@ export default function AdminLoginPage() {
         </div>
 
       </div>
+
     </main>
   );
 }

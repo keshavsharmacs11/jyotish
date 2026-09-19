@@ -13,6 +13,7 @@ import {
 
 import Booking from "@/models/Booking";
 import Consultant from "@/models/Consultant";
+import Payment from "@/models/Payment";
 
 /*
  * ============================================
@@ -31,6 +32,123 @@ const allowedStatuses = [
 
 type BookingStatus =
   (typeof allowedStatuses)[number];
+
+/*
+ * ============================================
+ * SERIALIZE BOOKING
+ * ============================================
+ *
+ * Refund information is stored in Payment.
+ *
+ * IMPORTANT:
+ *
+ * A payment whose status is "refunded", or a booking whose
+ * paymentStatus is "refunded", is always exposed to the
+ * frontend as refundStatus = "processed".
+ *
+ * This makes the persisted database state authoritative.
+ */
+
+function serializeBooking(
+  booking: any,
+  payment?: any
+) {
+  const refundStatus =
+    payment?.status === "refunded" ||
+    booking.paymentStatus === "refunded"
+      ? "processed"
+      : payment?.refundStatus || null;
+
+  const paymentStatus =
+    payment?.status || null;
+
+  return {
+    _id: booking._id
+      ? booking._id.toString()
+      : undefined,
+
+    bookingId:
+      booking.bookingId,
+
+    userId:
+      booking.userId
+        ? booking.userId.toString()
+        : null,
+
+    serviceId:
+      booking.serviceId,
+
+    serviceName:
+      booking.serviceName,
+
+    category:
+      booking.category,
+
+    mode:
+      booking.mode,
+
+    date:
+      booking.date,
+
+    time:
+      booking.time,
+
+    consultantId:
+      booking.consultantId
+        ? booking.consultantId.toString()
+        : null,
+
+    consultantName:
+      booking.consultantName || "",
+
+    customer:
+      booking.customer || {},
+
+    price:
+      booking.price,
+
+    currency:
+      booking.currency,
+
+    status:
+      booking.status,
+
+    paymentStatus:
+      booking.paymentStatus,
+
+    refundReason:
+      booking.refundReason || "",
+
+    razorpayOrderId:
+      booking.razorpayOrderId || "",
+
+    razorpayPaymentId:
+      booking.razorpayPaymentId || "",
+
+    /*
+     * ========================================
+     * REFUND INFORMATION
+     * ========================================
+     */
+
+    refundStatus,
+
+    razorpayRefundId:
+      payment?.razorpayRefundId || null,
+
+    paymentRefundReason:
+      payment?.refundReason || "",
+
+    paymentStatusFromPayment:
+      paymentStatus,
+
+    createdAt:
+      booking.createdAt,
+
+    updatedAt:
+      booking.updatedAt,
+  };
+}
 
 /*
  * ============================================
@@ -182,6 +300,73 @@ export async function GET(
 
     /*
      * ============================================
+     * FETCH PAYMENTS
+     * ============================================
+     */
+
+    const bookingIds =
+      bookings.map(
+        (booking: any) =>
+          booking._id
+      );
+
+    const payments =
+      bookingIds.length > 0
+        ? await Payment.find({
+            bookingId: {
+              $in: bookingIds,
+            },
+          }).lean()
+        : [];
+
+    /*
+     * ============================================
+     * CREATE PAYMENT MAP
+     * ============================================
+     */
+
+    const paymentMap =
+      new Map<
+        string,
+        any
+      >();
+
+    for (
+      const payment of payments
+    ) {
+      if (
+        payment.bookingId
+      ) {
+        paymentMap.set(
+          payment.bookingId.toString(),
+          payment
+        );
+      }
+    }
+
+    /*
+     * ============================================
+     * COMBINE BOOKING + PAYMENT DATA
+     * ============================================
+     */
+
+    const serializedBookings =
+      bookings.map(
+        (booking: any) => {
+          const payment =
+            paymentMap.get(
+              booking._id.toString()
+            );
+
+          return serializeBooking(
+            booking,
+            payment
+          );
+        }
+      );
+
+    /*
+     * ============================================
      * SUCCESS
      * ============================================
      */
@@ -190,9 +375,10 @@ export async function GET(
       success: true,
 
       count:
-        bookings.length,
+        serializedBookings.length,
 
-      bookings,
+      bookings:
+        serializedBookings,
     });
   } catch (error) {
     console.error(
@@ -221,20 +407,13 @@ export async function GET(
  * PATCH BOOKING
  * ============================================
  *
- * This endpoint supports:
+ * Supports:
  *
  * 1. Consultant assignment
- *
  * 2. Booking status update
  *
- * IMPORTANT:
- *
- * Paid bookings cannot be cancelled through
- * this endpoint.
- *
- * Paid booking cancellation must go through:
- *
- * /api/admin/bookings/refund
+ * Paid bookings cannot be cancelled here.
+ * They must use /api/admin/bookings/refund.
  */
 
 export async function PATCH(
@@ -301,11 +480,6 @@ export async function PATCH(
         }
       );
     }
-
-    /*
-     * At least one update operation
-     * must be supplied.
-     */
 
     if (
       !consultantId &&
@@ -392,20 +566,78 @@ export async function PATCH(
 
     /*
      * ============================================
+     * FIND PAYMENT
+     * ============================================
+     */
+
+    const payment =
+      await Payment.findOne({
+        bookingId:
+          booking._id,
+      }).lean();
+
+    /*
+     * ============================================
+     * REFUND STATE SAFETY
+     * ============================================
+     */
+
+    const refundStatus =
+      payment?.status === "refunded" ||
+      payment?.refundStatus === "processed" ||
+      booking.paymentStatus === "refunded"
+        ? "processed"
+        : payment?.refundStatus || null;
+
+    if (
+      newStatus &&
+      refundStatus === "pending"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          error:
+            "This booking has a refund request currently being processed. Wait for Razorpay confirmation before changing its status.",
+
+          refundPending: true,
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    if (
+      newStatus &&
+      refundStatus === "processed"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          error:
+            "This booking has already been refunded and cannot have its booking status changed through this endpoint.",
+
+          alreadyRefunded: true,
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    /*
+     * ============================================
      * PAID BOOKING CANCELLATION SAFETY
      * ============================================
-     *
-     * A paid booking must NOT be cancelled
-     * through the normal status endpoint.
-     *
-     * It must go through the dedicated
-     * Cancel & Refund endpoint so that the
-     * customer's payment is handled correctly.
      */
 
     if (
-      newStatus === "cancelled" &&
-      booking.paymentStatus === "paid"
+      newStatus ===
+        "cancelled" &&
+      booking.paymentStatus ===
+        "paid"
     ) {
       return NextResponse.json(
         {
@@ -426,9 +658,6 @@ export async function PATCH(
      * ============================================
      * CONSULTANT ASSIGNMENT
      * ============================================
-     *
-     * Only run this section when
-     * consultantId was supplied.
      */
 
     if (consultantId) {
@@ -569,12 +798,6 @@ export async function PATCH(
        * If the booking is already paid,
        * assigning a consultant automatically
        * moves it into consultant_assigned.
-       *
-       * IMPORTANT:
-       *
-       * Only do this when the admin did NOT
-       * explicitly request another status in
-       * the same request.
        */
 
       if (
@@ -598,16 +821,6 @@ export async function PATCH(
        * ==========================================
        * PAYMENT SAFETY
        * ==========================================
-       *
-       * A booking cannot become confirmed,
-       * consultant_assigned or completed
-       * unless payment has been received.
-       *
-       * Cancellation of an unpaid booking
-       * remains allowed.
-       *
-       * Paid cancellation was already blocked
-       * above and must use the refund endpoint.
        */
 
       const requiresPayment =
@@ -640,9 +853,6 @@ export async function PATCH(
        * ==========================================
        * CONSULTANT ASSIGNMENT SAFETY
        * ==========================================
-       *
-       * consultant_assigned and completed
-       * require a consultant.
        */
 
       if (
@@ -671,9 +881,6 @@ export async function PATCH(
        * ==========================================
        * COMPLETION SAFETY
        * ==========================================
-       *
-       * A cancelled booking cannot be
-       * completed.
        */
 
       if (
@@ -715,6 +922,18 @@ export async function PATCH(
 
     /*
      * ============================================
+     * REFRESH PAYMENT INFORMATION
+     * ============================================
+     */
+
+    const updatedPayment =
+      await Payment.findOne({
+        bookingId:
+          booking._id,
+      }).lean();
+
+    /*
+     * ============================================
      * SUCCESS RESPONSE
      * ============================================
      */
@@ -730,66 +949,11 @@ export async function PATCH(
       message:
         actionMessage,
 
-      booking: {
-        id:
-          booking._id.toString(),
-
-        bookingId:
-          booking.bookingId,
-
-        serviceId:
-          booking.serviceId,
-
-        serviceName:
-          booking.serviceName,
-
-        category:
-          booking.category,
-
-        mode:
-          booking.mode,
-
-        consultantId:
-          booking.consultantId
-            ? booking.consultantId.toString()
-            : null,
-
-        consultantName:
-          booking.consultantName,
-
-        date:
-          booking.date,
-
-        time:
-          booking.time,
-
-        price:
-          booking.price,
-
-        currency:
-          booking.currency,
-
-        status:
-          booking.status,
-
-        paymentStatus:
-          booking.paymentStatus,
-
-        customer:
-          booking.customer,
-
-        razorpayOrderId:
-          booking.razorpayOrderId,
-
-        razorpayPaymentId:
-          booking.razorpayPaymentId,
-
-        createdAt:
-          booking.createdAt,
-
-        updatedAt:
-          booking.updatedAt,
-      },
+      booking:
+        serializeBooking(
+          booking,
+          updatedPayment
+        ),
     });
   } catch (error) {
     console.error(

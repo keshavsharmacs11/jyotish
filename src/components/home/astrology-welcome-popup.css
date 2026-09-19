@@ -1,0 +1,2339 @@
+/* =========================================================
+   AKSHAANSHH JYOTISH
+   Astrology Welcome Popup
+   ========================================================= */
+
+
+.astrology-welcome-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+
+  background:
+    radial-gradient(
+      circle at 50% 8%,
+      rgba(196, 225, 245, 0.78),
+      transparent 42%
+    ),
+    radial-gradient(
+      circle at 12% 85%,
+      rgba(218, 232, 246, 0.72),
+      transparent 36%
+    ),
+    linear-gradient(135deg,
+      rgba(236, 244, 250, 0.88),
+      rgba(218, 231, 243, 0.90)
+    );
+
+  backdrop-filter: blur(14px) saturate(1.04);
+  -webkit-backdrop-filter: blur(14px) saturate(1.04);
+
+  animation:
+    astrologyWelcomeFade 0.3s ease both;
+
+  overflow-y: auto;
+}
+
+
+.astrology-welcome-modal {
+  position: relative;
+
+  width: min(720px, 100%);
+  max-height: min(860px, calc(100vh - 48px));
+
+  overflow-y: auto;
+
+  border: 1px solid rgba(212, 170, 76, 0.30);
+  border-radius: 24px;
+
+  background:
+    radial-gradient(
+      circle at 90% 0%,
+      rgba(212, 170, 76, 0.08),
+      transparent 34%
+    ),
+    linear-gradient(
+      145deg,
+      rgba(18, 21, 19, 0.98),
+      rgba(8, 11, 10, 0.98)
+    );
+
+  box-shadow:
+    0 30px 100px rgba(0, 0, 0, 0.60),
+    0 0 0 1px rgba(255, 255, 255, 0.025);
+
+  color: #f4eee1;
+
+  animation:
+    astrologyWelcomeSlide 0.38s
+      cubic-bezier(0.16, 1, 0.3, 1)
+      both;
+
+  scrollbar-width: thin;
+  scrollbar-color:
+    rgba(212, 170, 76, 0.45)
+    transparent;
+}
+
+
+.astrology-welcome-modal::-webkit-scrollbar {
+  width: 6px;
+}
+
+
+.astrology-welcome-modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+
+.astrology-welcome-modal::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(212, 170, 76, 0.40);
+}
+
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+
+.astrology-welcome-header {
+  position: relative;
+
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+
+  padding: 34px 36px 28px;
+
+  border-bottom: 1px solid
+    rgba(255, 255, 255, 0.075);
+}
+
+
+.astrology-welcome-eyebrow {
+  display: block;
+
+  margin-bottom: 10px;
+
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+
+  color: #d6ae54;
+}
+
+
+.astrology-welcome-header h2 {
+  margin: 0;
+
+  max-width: 570px;
+
+  font-family:
+    Georgia,
+    "Times New Roman",
+    serif;
+
+  font-size: clamp(25px, 4vw, 38px);
+  line-height: 1.12;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+
+  color: #f5efe2;
+}
+
+
+.astrology-welcome-header p {
+  margin: 12px 0 0;
+
+  max-width: 570px;
+
+  color: rgba(244, 238, 225, 0.65);
+
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+
+.astrology-welcome-header > div:first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+
+.astrology-welcome-header-actions {
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+
+.astrology-welcome-language-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+
+.astrology-welcome-language-label {
+  color: rgba(244, 238, 225, 0.58);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+
+.astrology-welcome-language {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+
+  min-height: 36px;
+  padding: 3px;
+
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 999px;
+
+  background: rgba(255, 255, 255, 0.025);
+}
+
+
+.astrology-welcome-language button {
+  min-width: 38px;
+  min-height: 29px;
+  padding: 5px 9px;
+
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+
+  color: rgba(244, 238, 225, 0.48);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+
+.astrology-welcome-language button:focus-visible {
+  outline: 1px solid rgba(212, 170, 76, 0.70);
+  outline-offset: 2px;
+}
+
+
+.astrology-welcome-language button:hover {
+  color: #f3dfae;
+}
+
+
+.astrology-welcome-language button.active {
+  color: #17140d;
+  background: #d4aa4c;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.16);
+}
+
+
+.astrology-welcome-language > span {
+  color: rgba(244, 238, 225, 0.18);
+  font-size: 9px;
+  user-select: none;
+}
+
+
+.astrology-welcome-close {
+  flex: 0 0 auto;
+
+  width: 38px;
+  height: 38px;
+
+  display: grid;
+  place-items: center;
+
+  border: 1px solid
+    rgba(255, 255, 255, 0.10);
+
+  border-radius: 50%;
+
+  background: rgba(255, 255, 255, 0.035);
+
+  color: rgba(244, 238, 225, 0.75);
+
+  font-size: 25px;
+  font-weight: 300;
+  line-height: 1;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+
+.astrology-welcome-close:hover {
+  border-color:
+    rgba(212, 170, 76, 0.45);
+
+  background:
+    rgba(212, 170, 76, 0.10);
+
+  color: #f4d889;
+
+  transform: rotate(4deg);
+}
+
+
+/* =========================================================
+   MENU
+   ========================================================= */
+
+.astrology-welcome-menu {
+  display: grid;
+  gap: 14px;
+
+  padding: 30px 36px 36px;
+}
+
+
+.astrology-welcome-option {
+  width: 100%;
+
+  display: grid;
+  grid-template-columns:
+    48px minmax(0, 1fr) 28px;
+
+  align-items: center;
+  gap: 16px;
+
+  padding: 20px;
+
+  border: 1px solid
+    rgba(255, 255, 255, 0.085);
+
+  border-radius: 17px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.045),
+      rgba(255, 255, 255, 0.018)
+    );
+
+  color: inherit;
+
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.25s ease,
+    border-color 0.25s ease,
+    background 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+
+.astrology-welcome-option:hover {
+  transform: translateY(-2px);
+
+  border-color:
+    rgba(212, 170, 76, 0.42);
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(212, 170, 76, 0.095),
+      rgba(255, 255, 255, 0.025)
+    );
+
+  box-shadow:
+    0 14px 35px rgba(0, 0, 0, 0.20);
+}
+
+
+.astrology-welcome-option-icon {
+  width: 48px;
+  height: 48px;
+
+  display: grid;
+  place-items: center;
+
+  border: 1px solid
+    rgba(212, 170, 76, 0.28);
+
+  border-radius: 14px;
+
+  background:
+    rgba(212, 170, 76, 0.07);
+
+  color: #d6ae54;
+
+  font-family: Georgia, serif;
+  font-size: 21px;
+}
+
+
+.astrology-welcome-option strong {
+  display: block;
+
+  margin-bottom: 5px;
+
+  color: #f5efe2;
+
+  font-size: 15px;
+  font-weight: 600;
+}
+
+
+.astrology-welcome-option small {
+  display: block;
+
+  color:
+    rgba(244, 238, 225, 0.52);
+
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+
+.astrology-welcome-arrow {
+  color: #d6ae54;
+
+  font-size: 19px;
+
+  transition:
+    transform 0.2s ease;
+}
+
+
+.astrology-welcome-option:hover
+.astrology-welcome-arrow {
+  transform: translateX(4px);
+}
+
+
+/* =========================================================
+   BACK BUTTON
+   ========================================================= */
+
+.astrology-welcome-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  margin-bottom: 22px;
+
+  padding: 0;
+
+  border: 0;
+
+  background: transparent;
+
+  color:
+    rgba(244, 238, 225, 0.58);
+
+  font-size: 12px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    color 0.2s ease;
+}
+
+
+.astrology-welcome-back:hover {
+  color: #d6ae54;
+}
+
+
+/* =========================================================
+   FORM
+   ========================================================= */
+
+.astrology-welcome-form,
+.astrology-welcome-rashifal,
+.astrology-welcome-result {
+  padding: 28px 36px 36px;
+}
+
+
+.astrology-welcome-section-title,
+.astrology-welcome-result-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+
+  margin-bottom: 24px;
+}
+
+
+.astrology-welcome-section-title > span,
+.astrology-welcome-result-heading > span {
+  flex: 0 0 auto;
+
+  width: 38px;
+  height: 38px;
+
+  display: grid;
+  place-items: center;
+
+  border: 1px solid
+    rgba(212, 170, 76, 0.28);
+
+  border-radius: 12px;
+
+  background:
+    rgba(212, 170, 76, 0.07);
+
+  color: #d6ae54;
+
+  font-family: Georgia, serif;
+}
+
+
+.astrology-welcome-section-title h3,
+.astrology-welcome-result-heading h3 {
+  margin: 1px 0 4px;
+
+  font-family:
+    Georgia,
+    "Times New Roman",
+    serif;
+
+  font-size: 22px;
+  line-height: 1.2;
+  font-weight: 500;
+
+  color: #f5efe2;
+}
+
+
+.astrology-welcome-section-title p,
+.astrology-welcome-result-heading p {
+  margin: 0;
+
+  color:
+    rgba(244, 238, 225, 0.48);
+
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   FORM FIELDS
+   Premium Date / Time / Location Controls
+   ========================================================= */
+
+.astrology-welcome-field {
+  display: block;
+
+  margin-bottom: 18px;
+}
+
+
+.astrology-welcome-field > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+
+  margin-bottom: 8px;
+
+  color:
+    rgba(244, 238, 225, 0.82);
+
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+
+.astrology-welcome-field em {
+  color:
+    rgba(244, 238, 225, 0.40);
+
+  font-style: normal;
+  font-weight: 400;
+}
+
+
+/* ---------------------------------------------------------
+   INPUT BASE
+   --------------------------------------------------------- */
+
+.astrology-welcome-field input,
+.astrology-welcome-field select {
+  width: 100%;
+  height: 50px;
+
+  padding: 0 14px;
+
+  border: 1px solid
+    rgba(255, 255, 255, 0.10);
+
+  border-radius: 12px;
+
+  outline: none;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.050),
+      rgba(255, 255, 255, 0.025)
+    );
+
+  color: #f4eee1;
+
+  font: inherit;
+  font-size: 13px;
+
+  transition:
+    border-color 0.22s ease,
+    background 0.22s ease,
+    box-shadow 0.22s ease,
+    transform 0.22s ease;
+}
+
+
+.astrology-welcome-field input:hover,
+.astrology-welcome-field select:hover {
+  border-color:
+    rgba(212, 170, 76, 0.30);
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(212, 170, 76, 0.055),
+      rgba(255, 255, 255, 0.025)
+    );
+}
+
+
+.astrology-welcome-field input:focus,
+.astrology-welcome-field select:focus {
+  border-color:
+    rgba(212, 170, 76, 0.62);
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(212, 170, 76, 0.075),
+      rgba(255, 255, 255, 0.025)
+    );
+
+  box-shadow:
+    0 0 0 3px
+      rgba(212, 170, 76, 0.075),
+    0 8px 24px
+      rgba(0, 0, 0, 0.14);
+}
+
+
+.astrology-welcome-field input::placeholder {
+  color:
+    rgba(244, 238, 225, 0.32);
+}
+
+
+.astrology-welcome-field option {
+  background: #151815;
+  color: #f4eee1;
+}
+
+
+/* ---------------------------------------------------------
+   DATE PICKER
+   --------------------------------------------------------- */
+
+.astrology-welcome-field input[type="date"] {
+  position: relative;
+
+  padding-right: 48px;
+
+  color-scheme: dark;
+
+  cursor: pointer;
+}
+
+
+.astrology-welcome-field input[type="date"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+
+  right: 13px;
+
+  width: 19px;
+  height: 19px;
+
+  margin: 0;
+
+  opacity: 0.78;
+
+  cursor: pointer;
+
+  filter:
+    invert(76%)
+    sepia(34%)
+    saturate(650%)
+    hue-rotate(358deg)
+    brightness(94%);
+
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+
+.astrology-welcome-field
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+
+  transform: scale(1.08);
+}
+
+
+/* ---------------------------------------------------------
+   TIME PICKER
+   --------------------------------------------------------- */
+
+.astrology-welcome-field input[type="time"] {
+  position: relative;
+
+  padding-right: 48px;
+
+  color-scheme: dark;
+
+  cursor: pointer;
+}
+
+
+.astrology-welcome-field input[type="time"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+
+  right: 13px;
+
+  width: 19px;
+  height: 19px;
+
+  margin: 0;
+
+  opacity: 0.78;
+
+  cursor: pointer;
+
+  filter:
+    invert(76%)
+    sepia(34%)
+    saturate(650%)
+    hue-rotate(358deg)
+    brightness(94%);
+
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+
+.astrology-welcome-field
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+
+  transform: scale(1.08);
+}
+
+
+/* ---------------------------------------------------------
+   SELECT DROPDOWN
+   --------------------------------------------------------- */
+
+.astrology-welcome-field select {
+  appearance: none;
+  -webkit-appearance: none;
+
+  padding-right: 44px;
+
+  cursor: pointer;
+
+  background-image:
+    linear-gradient(
+      45deg,
+      transparent 50%,
+      rgba(212, 170, 76, 0.85) 50%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(212, 170, 76, 0.85) 50%,
+      transparent 50%
+    ),
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.050),
+      rgba(255, 255, 255, 0.025)
+    );
+
+  background-position:
+    calc(100% - 19px) 21px,
+    calc(100% - 13px) 21px,
+    0 0;
+
+  background-size:
+    6px 6px,
+    6px 6px,
+    100% 100%;
+
+  background-repeat: no-repeat;
+}
+
+
+/* ---------------------------------------------------------
+   CITY + STATE
+   --------------------------------------------------------- */
+
+.astrology-welcome-location-grid {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1.35fr)
+    minmax(150px, 0.75fr);
+
+  gap: 12px;
+
+  margin-bottom: 2px;
+}
+
+
+.astrology-welcome-location-grid
+.astrology-welcome-field {
+  min-width: 0;
+}
+
+
+.astrology-welcome-location-grid
+.astrology-welcome-field input {
+  min-width: 0;
+}
+
+
+/* ---------------------------------------------------------
+   LOCATION PREVIEW
+   --------------------------------------------------------- */
+
+.astrology-welcome-location-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+
+  margin-top: -4px;
+  margin-bottom: 18px;
+
+  padding: 10px 12px;
+
+  border: 1px solid
+    rgba(212, 170, 76, 0.13);
+
+  border-radius: 10px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(212, 170, 76, 0.045),
+      rgba(255, 255, 255, 0.015)
+    );
+
+  color:
+    rgba(244, 238, 225, 0.48);
+
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+
+
+.astrology-welcome-location-preview strong {
+  color:
+    rgba(244, 238, 225, 0.76);
+
+  font-weight: 600;
+}
+
+
+/* ---------------------------------------------------------
+   FIELD HELP
+   --------------------------------------------------------- */
+
+.astrology-welcome-field-help {
+  margin: 7px 0 0;
+
+  color:
+    rgba(244, 238, 225, 0.38);
+
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   NOTE / INFO
+   ========================================================= */
+
+.astrology-welcome-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+
+  margin: 18px 0 18px;
+  padding: 13px 14px;
+
+  border: 1px solid
+    rgba(212, 170, 76, 0.13);
+
+  border-radius: 12px;
+
+  background:
+    rgba(212, 170, 76, 0.035);
+}
+
+
+.astrology-welcome-note > span {
+  flex: 0 0 auto;
+
+  width: 19px;
+  height: 19px;
+
+  display: grid;
+  place-items: center;
+
+  border: 1px solid
+    rgba(212, 170, 76, 0.35);
+
+  border-radius: 50%;
+
+  color: #d6ae54;
+
+  font-family: Georgia, serif;
+  font-size: 11px;
+}
+
+
+.astrology-welcome-note p {
+  margin: 0;
+
+  color:
+    rgba(244, 238, 225, 0.48);
+
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+
+/* =========================================================
+   ERROR
+   ========================================================= */
+
+.astrology-welcome-error {
+  margin: 14px 0;
+
+  padding: 11px 13px;
+
+  border: 1px solid
+    rgba(210, 100, 100, 0.30);
+
+  border-radius: 10px;
+
+  background:
+    rgba(160, 50, 50, 0.09);
+
+  color: #e7aaaa;
+
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   KEYBOARD / TOUCH ACCESSIBILITY
+   ========================================================= */
+
+.astrology-welcome-option:focus-visible,
+.astrology-welcome-primary:focus-visible,
+.astrology-welcome-back:focus-visible,
+.astrology-welcome-close:focus-visible,
+.astrology-welcome-rashi-grid button:focus-visible,
+.astrology-welcome-field input:focus-visible,
+.astrology-welcome-field select:focus-visible {
+  outline: 2px solid
+    rgba(212, 170, 76, 0.78);
+
+  outline-offset: 3px;
+}
+
+
+.astrology-welcome-option:active,
+.astrology-welcome-rashi-grid button:active {
+  transform: translateY(0);
+}
+
+
+/* =========================================================
+   PRIMARY BUTTON
+   ========================================================= */
+
+.astrology-welcome-primary {
+  width: 100%;
+  min-height: 50px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-top: 12px;
+
+  padding: 13px 18px;
+
+  border: 1px solid
+    rgba(232, 194, 105, 0.50);
+
+  border-radius: 12px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #d4aa4c,
+      #b98c35
+    );
+
+  color: #17140d;
+
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 10px 28px
+    rgba(0, 0, 0, 0.20);
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease;
+}
+
+
+.astrology-welcome-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+
+  filter: brightness(1.06);
+
+  box-shadow:
+    0 14px 34px
+    rgba(0, 0, 0, 0.28);
+}
+
+
+.astrology-welcome-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+
+.astrology-welcome-primary:disabled {
+  opacity: 0.48;
+
+  cursor: not-allowed;
+}
+
+
+/* =========================================================
+   RASHI GRID
+   ========================================================= */
+
+.astrology-welcome-rashi-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap: 10px;
+
+  margin-bottom: 22px;
+}
+
+
+.astrology-welcome-rashi-grid button {
+  min-height: 78px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  gap: 5px;
+
+  padding: 10px 7px;
+
+  border: 1px solid
+    rgba(255, 255, 255, 0.085);
+
+  border-radius: 13px;
+
+  background:
+    rgba(255, 255, 255, 0.025);
+
+  color: #f4eee1;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+
+.astrology-welcome-rashi-grid button:hover {
+  transform: translateY(-1px);
+
+  border-color:
+    rgba(212, 170, 76, 0.40);
+
+  background:
+    rgba(212, 170, 76, 0.06);
+}
+
+
+.astrology-welcome-rashi-grid button.selected {
+  border-color:
+    rgba(212, 170, 76, 0.72);
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(212, 170, 76, 0.16),
+      rgba(212, 170, 76, 0.055)
+    );
+
+  box-shadow:
+    inset 0 0 0 1px
+    rgba(212, 170, 76, 0.07);
+}
+
+
+.astrology-welcome-rashi-grid button span {
+  font-family:
+    Georgia,
+    "Times New Roman",
+    serif;
+
+  font-size: 17px;
+
+  color: #f5e5bd;
+}
+
+
+.astrology-welcome-rashi-grid button small {
+  color:
+    rgba(244, 238, 225, 0.45);
+
+  font-size: 9px;
+  letter-spacing: 0.02em;
+}
+
+
+/* =========================================================
+   RESULT
+   ========================================================= */
+
+.astrology-welcome-result-heading {
+  margin-bottom: 20px;
+}
+
+
+.astrology-welcome-stats {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap: 10px;
+
+  margin-bottom: 14px;
+}
+
+
+.astrology-welcome-stats > div {
+  min-width: 0;
+
+  padding: 14px 12px;
+
+  border: 1px solid
+    rgba(255, 255, 255, 0.075);
+
+  border-radius: 13px;
+
+  background:
+    rgba(255, 255, 255, 0.025);
+}
+
+
+.astrology-welcome-stats small,
+.astrology-welcome-lucky-grid small,
+.astrology-welcome-number-row small,
+.astrology-welcome-saturn small {
+  display: block;
+
+  margin-bottom: 6px;
+
+  color:
+    rgba(244, 238, 225, 0.42);
+
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+
+.astrology-welcome-stats strong,
+.astrology-welcome-lucky-grid strong,
+.astrology-welcome-number-row strong,
+.astrology-welcome-saturn strong {
+  display: block;
+
+  overflow-wrap: anywhere;
+
+  color: #f3dfae;
+
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+
+/* =========================================================
+   RESULT CARDS
+   ========================================================= */
+
+.astrology-welcome-card {
+  margin-top: 12px;
+  padding: 18px;
+
+  border: 1px solid
+    rgba(255, 255, 255, 0.075);
+
+  border-radius: 15px;
+
+  background:
+    rgba(255, 255, 255, 0.025);
+}
+
+
+.astrology-welcome-card.astrology-welcome-highlight {
+  border-color:
+    rgba(212, 170, 76, 0.18);
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(212, 170, 76, 0.065),
+      rgba(255, 255, 255, 0.02)
+    );
+}
+
+
+.astrology-welcome-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  margin-bottom: 13px;
+}
+
+
+.astrology-welcome-card-heading > span {
+  color:
+    rgba(212, 170, 76, 0.60);
+
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+
+.astrology-welcome-card-heading h4 {
+  margin: 0;
+
+  color: #f3e7ca;
+
+  font-family:
+    Georgia,
+    "Times New Roman",
+    serif;
+
+  font-size: 15px;
+  font-weight: 500;
+}
+
+
+.astrology-welcome-card p {
+  margin: 0;
+
+  color:
+    rgba(244, 238, 225, 0.62);
+
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+
+.astrology-welcome-card p + p {
+  margin-top: 10px;
+}
+
+
+/* =========================================================
+   NUMEROLOGY
+   ========================================================= */
+
+.astrology-welcome-number-row {
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+
+  gap: 10px;
+
+  margin-bottom: 15px;
+}
+
+
+.astrology-welcome-number-row > div,
+.astrology-welcome-saturn > div {
+  padding: 12px;
+
+  border: 1px solid
+    rgba(255, 255, 255, 0.055);
+
+  border-radius: 11px;
+
+  background:
+    rgba(0, 0, 0, 0.10);
+}
+
+
+.astrology-welcome-number-row strong {
+  font-size: 23px;
+
+  font-family:
+    Georgia,
+    "Times New Roman",
+    serif;
+}
+
+
+/* =========================================================
+   SATURN
+   ========================================================= */
+
+.astrology-welcome-saturn {
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+
+  gap: 10px;
+
+  margin-bottom: 15px;
+}
+
+
+/* =========================================================
+   LUCKY GRID
+   ========================================================= */
+
+.astrology-welcome-lucky-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+
+  gap: 10px;
+
+  margin-top: 12px;
+}
+
+
+.astrology-welcome-lucky-grid > div {
+  min-width: 0;
+
+  padding: 14px 12px;
+
+  border: 1px solid
+    rgba(212, 170, 76, 0.12);
+
+  border-radius: 12px;
+
+  background:
+    rgba(212, 170, 76, 0.035);
+}
+
+
+.astrology-welcome-lucky-grid strong {
+  font-size: 12px;
+}
+
+
+/* =========================================================
+   WARNING
+   ========================================================= */
+
+.astrology-welcome-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+
+  margin-top: 13px;
+  padding: 13px 14px;
+
+  border: 1px solid
+    rgba(202, 155, 70, 0.22);
+
+  border-radius: 12px;
+
+  background:
+    rgba(202, 155, 70, 0.045);
+}
+
+
+.astrology-welcome-warning > span {
+  flex: 0 0 auto;
+
+  width: 19px;
+  height: 19px;
+
+  display: grid;
+  place-items: center;
+
+  border: 1px solid
+    rgba(212, 170, 76, 0.38);
+
+  border-radius: 50%;
+
+  color: #d6ae54;
+
+  font-size: 10px;
+  font-weight: 700;
+}
+
+
+.astrology-welcome-warning p {
+  margin: 0;
+
+  color:
+    rgba(244, 238, 225, 0.52);
+
+  font-size: 10px;
+  line-height: 1.65;
+}
+
+
+/* =========================================================
+   DISCLAIMER
+   ========================================================= */
+
+.astrology-welcome-disclaimer {
+  margin-top: 14px;
+
+  padding: 12px 13px;
+
+  border-top: 1px solid
+    rgba(255, 255, 255, 0.06);
+
+  color:
+    rgba(244, 238, 225, 0.38);
+
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+
+/* =========================================================
+   CLEAN FORM RHYTHM
+   ========================================================= */
+
+.astrology-welcome-form > .astrology-welcome-primary,
+.astrology-welcome-rashifal > .astrology-welcome-primary,
+.astrology-welcome-result > .astrology-welcome-primary {
+  margin-top: 20px;
+}
+
+
+.astrology-welcome-form .astrology-welcome-error,
+.astrology-welcome-rashifal .astrology-welcome-error {
+  margin-bottom: 4px;
+}
+
+
+/* =========================================================
+   ANIMATIONS
+   ========================================================= */
+
+@keyframes astrologyWelcomeFade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+
+@keyframes astrologyWelcomeSlide {
+  from {
+    opacity: 0;
+
+    transform:
+      translateY(20px)
+      scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      translateY(0)
+      scale(1);
+  }
+}
+
+
+/* =========================================================
+   RESPONSIVE HARDENING
+   iPhone / Android / Tablet / Laptop / Desktop
+   ========================================================= */
+
+/* Keep scrolling inside the dialog and avoid background bounce. */
+.astrology-welcome-overlay {
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
+.astrology-welcome-modal {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.astrology-welcome-option,
+.astrology-welcome-primary,
+.astrology-welcome-close,
+.astrology-welcome-back,
+.astrology-welcome-rashi-grid button,
+.astrology-welcome-language button,
+.astrology-welcome-field input,
+.astrology-welcome-field select,
+.astrology-welcome-field textarea {
+  touch-action: manipulation;
+}
+
+/* ---------------------------------------------------------
+   LAPTOP / LARGE DESKTOP
+   --------------------------------------------------------- */
+
+@media (min-width: 1100px) {
+  .astrology-welcome-overlay {
+    padding: 32px;
+  }
+
+  .astrology-welcome-modal {
+    width: min(740px, 100%);
+    max-height: min(880px, calc(100dvh - 64px));
+  }
+}
+
+/* ---------------------------------------------------------
+   TABLET + SMALL LAPTOP
+   --------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .astrology-welcome-overlay {
+    padding: 18px;
+  }
+
+  .astrology-welcome-modal {
+    max-height: calc(100dvh - 36px);
+  }
+
+  .astrology-welcome-header {
+    padding: 28px 28px 24px;
+    gap: 18px;
+  }
+
+  .astrology-welcome-menu,
+  .astrology-welcome-form,
+  .astrology-welcome-rashifal,
+  .astrology-welcome-result {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+}
+
+/* ---------------------------------------------------------
+   TABLET / LARGE PHONE
+   --------------------------------------------------------- */
+
+@media (max-width: 700px) {
+  .astrology-welcome-overlay {
+    padding: 14px;
+    align-items: center;
+  }
+
+  .astrology-welcome-modal {
+    width: 100%;
+    max-height: calc(100dvh - 28px);
+    border-radius: 20px;
+  }
+
+  .astrology-welcome-header {
+    padding: 26px 24px 22px;
+    gap: 14px;
+    flex-direction: column;
+  }
+
+  .astrology-welcome-header > div:first-child {
+    width: 100%;
+  }
+
+  .astrology-welcome-header-actions {
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .astrology-welcome-menu,
+  .astrology-welcome-form,
+  .astrology-welcome-rashifal,
+  .astrology-welcome-result {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .astrology-welcome-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .astrology-welcome-location-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .astrology-welcome-location-grid .astrology-welcome-field {
+    margin-bottom: 15px;
+  }
+
+  .astrology-welcome-field input,
+  .astrology-welcome-field select {
+    min-height: 48px;
+  }
+
+  .astrology-welcome-field input[type="date"],
+  .astrology-welcome-field input[type="time"] {
+    height: 50px;
+    padding-right: 46px;
+  }
+
+  .astrology-welcome-option,
+  .astrology-welcome-primary {
+    min-height: 48px;
+  }
+}
+
+/* ---------------------------------------------------------
+   MOBILE — iPhone / Android
+   --------------------------------------------------------- */
+
+@media (max-width: 560px) {
+  .astrology-welcome-overlay {
+    align-items: center;
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-right: max(8px, env(safe-area-inset-right));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    padding-left: max(8px, env(safe-area-inset-left));
+  }
+
+  .astrology-welcome-modal {
+    max-height: calc(100dvh - 16px);
+    border-radius: 17px;
+  }
+
+  .astrology-welcome-header {
+    padding: 20px 18px 18px;
+    gap: 12px;
+  }
+
+  .astrology-welcome-header h2 {
+    font-size: clamp(23px, 7vw, 28px);
+    line-height: 1.14;
+  }
+
+  .astrology-welcome-header p {
+    max-width: none;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .astrology-welcome-header-actions {
+    gap: 8px;
+  }
+
+  .astrology-welcome-language-control {
+    min-width: 0;
+    gap: 5px;
+  }
+
+  .astrology-welcome-language-label {
+    font-size: 8px;
+  }
+
+  .astrology-welcome-language {
+    min-height: 32px;
+    padding: 2px 3px;
+  }
+
+  .astrology-welcome-language button {
+    min-width: 38px;
+    min-height: 27px;
+    padding: 4px 7px;
+    font-size: 9px;
+  }
+
+  .astrology-welcome-close {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    font-size: 22px;
+  }
+
+  .astrology-welcome-menu,
+  .astrology-welcome-form,
+  .astrology-welcome-rashifal,
+  .astrology-welcome-result {
+    padding: 20px 18px 22px;
+  }
+
+  .astrology-welcome-option {
+    grid-template-columns: 40px minmax(0, 1fr) 20px;
+    gap: 11px;
+    padding: 14px;
+    min-height: 64px;
+  }
+
+  .astrology-welcome-option-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    font-size: 18px;
+  }
+
+  .astrology-welcome-option strong {
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .astrology-welcome-option small {
+    font-size: 10px;
+    line-height: 1.45;
+  }
+
+  .astrology-welcome-section-title,
+  .astrology-welcome-result-heading {
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .astrology-welcome-section-title > span,
+  .astrology-welcome-result-heading > span {
+    width: 36px;
+    height: 36px;
+  }
+
+  .astrology-welcome-section-title h3,
+  .astrology-welcome-result-heading h3 {
+    font-size: 19px;
+  }
+
+  .astrology-welcome-field {
+    margin-bottom: 15px;
+  }
+
+  .astrology-welcome-field > span {
+    font-size: 11.5px;
+  }
+
+  .astrology-welcome-field input,
+  .astrology-welcome-field select,
+  .astrology-welcome-field textarea {
+    font-size: 13px;
+  }
+
+  .astrology-welcome-field input,
+  .astrology-welcome-field select {
+    height: 48px;
+    min-height: 48px;
+  }
+
+  .astrology-welcome-field textarea {
+    min-height: 82px;
+  }
+
+  .astrology-welcome-location-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .astrology-welcome-location-grid .astrology-welcome-field {
+    margin-bottom: 13px;
+  }
+
+  .astrology-welcome-location-preview {
+    font-size: 10px;
+    padding: 9px 10px;
+    line-height: 1.5;
+  }
+
+  .astrology-welcome-rashi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .astrology-welcome-rashi-grid button {
+    min-height: 68px;
+    padding: 8px 5px;
+  }
+
+  .astrology-welcome-rashi-grid button span {
+    font-size: 15px;
+  }
+
+  .astrology-welcome-rashi-grid button small {
+    font-size: 8px;
+  }
+
+  .astrology-welcome-stats {
+    gap: 7px;
+  }
+
+  .astrology-welcome-stats > div {
+    padding: 11px 9px;
+  }
+
+  .astrology-welcome-stats strong {
+    font-size: 11px;
+  }
+
+  .astrology-welcome-card {
+    padding: 14px;
+  }
+
+  .astrology-welcome-number-row,
+  .astrology-welcome-saturn {
+    gap: 7px;
+  }
+
+  .astrology-welcome-lucky-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .astrology-welcome-lucky-grid > div:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---------------------------------------------------------
+   VERY SMALL PHONES — iPhone SE / compact Android
+   --------------------------------------------------------- */
+
+@media (max-width: 380px) {
+  .astrology-welcome-modal {
+    border-radius: 14px;
+  }
+
+  .astrology-welcome-header {
+    padding: 18px 14px 16px;
+  }
+
+  .astrology-welcome-header h2 {
+    font-size: 22px;
+  }
+
+  .astrology-welcome-header p {
+    font-size: 11px;
+  }
+
+  .astrology-welcome-menu,
+  .astrology-welcome-form,
+  .astrology-welcome-rashifal,
+  .astrology-welcome-result {
+    padding: 17px 14px 20px;
+  }
+
+  .astrology-welcome-option {
+    grid-template-columns: 36px minmax(0, 1fr) 18px;
+    gap: 9px;
+    padding: 12px;
+  }
+
+  .astrology-welcome-option-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+
+  .astrology-welcome-option strong {
+    font-size: 12px;
+  }
+
+  .astrology-welcome-option small {
+    font-size: 9px;
+  }
+
+  .astrology-welcome-arrow {
+    font-size: 17px;
+  }
+
+  .astrology-welcome-language-label {
+    display: none;
+  }
+
+  .astrology-welcome-language button {
+    min-width: 34px;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  .astrology-welcome-close {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+
+  .astrology-welcome-rashi-grid button {
+    min-height: 64px;
+  }
+
+  .astrology-welcome-rashi-grid button span {
+    font-size: 14px;
+  }
+
+  .astrology-welcome-rashi-grid button small {
+    font-size: 7px;
+  }
+}
+
+/* ---------------------------------------------------------
+   SMALL SCREENS IN LANDSCAPE MODE
+   Prevent tall content from being trapped behind the address bar.
+   --------------------------------------------------------- */
+
+@media (max-height: 560px) and (orientation: landscape) {
+  .astrology-welcome-overlay {
+    align-items: flex-start;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .astrology-welcome-modal {
+    max-height: calc(100dvh - 16px);
+  }
+
+  .astrology-welcome-header {
+    padding: 16px 20px 14px;
+  }
+
+  .astrology-welcome-header h2 {
+    font-size: 22px;
+  }
+
+  .astrology-welcome-header p {
+    margin-top: 7px;
+    font-size: 11px;
+  }
+
+  .astrology-welcome-menu,
+  .astrology-welcome-form,
+  .astrology-welcome-rashifal,
+  .astrology-welcome-result {
+    padding-top: 16px;
+    padding-bottom: 18px;
+  }
+
+  .astrology-welcome-location-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
+/* =========================================================
+   REDUCED MOTION
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .astrology-welcome-overlay,
+  .astrology-welcome-modal {
+    animation: none;
+  }
+
+
+  .astrology-welcome-option,
+  .astrology-welcome-primary,
+  .astrology-welcome-close,
+  .astrology-welcome-arrow {
+    transition: none;
+  }
+}
+
+
+/* =========================================================
+   FINAL PERSONAL READING EXPERIENCE
+   Customer-facing result is intentionally simple, personal,
+   bullet-led, and free of technical astrology details.
+   ========================================================= */
+
+.astrology-welcome-result-heading--premium {
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.astrology-welcome-result-mark {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(212, 170, 76, 0.35);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(212, 170, 76, 0.13), rgba(255, 255, 255, 0.025));
+  color: #e4c36f;
+  font-size: 20px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+}
+
+.astrology-welcome-result-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: #d6ae54;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.astrology-welcome-result-heading--premium h3 {
+  margin: 0;
+  max-width: 610px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(23px, 3.5vw, 31px);
+  line-height: 1.18;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: #f5efe2;
+}
+
+.astrology-welcome-result-heading--premium p {
+  margin: 7px 0 0;
+  color: rgba(244, 238, 225, 0.48);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.astrology-welcome-question-card {
+  margin: 0 0 13px;
+  padding: 13px 14px;
+  border: 1px solid rgba(212, 170, 76, 0.18);
+  border-radius: 13px;
+  background: rgba(212, 170, 76, 0.045);
+}
+
+.astrology-welcome-question-card > span {
+  display: block;
+  margin-bottom: 6px;
+  color: rgba(214, 174, 84, 0.72);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.astrology-welcome-question-card p {
+  margin: 0;
+  color: rgba(244, 238, 225, 0.72);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.astrology-welcome-reading {
+  display: grid;
+  gap: 11px;
+}
+
+.astrology-welcome-reading-main,
+.astrology-welcome-reading-section {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.astrology-welcome-reading-main {
+  padding: 19px 18px 18px;
+  border-color: rgba(212, 170, 76, 0.24);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(212, 170, 76, 0.075), transparent 40%),
+    linear-gradient(145deg, rgba(212, 170, 76, 0.075), rgba(255, 255, 255, 0.018));
+}
+
+.astrology-welcome-reading-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: rgba(214, 174, 84, 0.76);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.astrology-welcome-reading-kicker > span:first-child {
+  color: #d6ae54;
+}
+
+.astrology-welcome-reading-main h4 {
+  margin: 0 0 10px;
+  color: #f6e9c9;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(18px, 3vw, 23px);
+  line-height: 1.28;
+  font-weight: 500;
+}
+
+.astrology-welcome-reading-section {
+  padding: 16px 17px 15px;
+}
+
+.astrology-welcome-reading-section--current {
+  border-color: rgba(148, 181, 212, 0.12);
+  background: linear-gradient(145deg, rgba(88, 124, 157, 0.045), rgba(255, 255, 255, 0.018));
+}
+
+.astrology-welcome-reading-section--takeaway {
+  border-color: rgba(212, 170, 76, 0.13);
+}
+
+.astrology-welcome-reading-section-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 11px;
+}
+
+.astrology-welcome-reading-section-heading > span {
+  flex: 0 0 auto;
+  padding-top: 2px;
+  color: rgba(214, 174, 84, 0.6);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.astrology-welcome-reading-section-heading h4 {
+  margin: 0;
+  color: #f2e5c7;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+  line-height: 1.38;
+  font-weight: 500;
+}
+
+.astrology-welcome-reading-section-heading p {
+  margin: 4px 0 0;
+  color: rgba(244, 238, 225, 0.42);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.astrology-welcome-reading-list {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.astrology-welcome-reading-list li {
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 10px;
+  color: rgba(244, 238, 225, 0.72);
+  font-size: 12px;
+  line-height: 1.62;
+}
+
+.astrology-welcome-reading-list--lead li {
+  grid-template-columns: 8px minmax(0, 1fr);
+  gap: 11px;
+  color: rgba(246, 237, 218, 0.84);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.astrology-welcome-reading-list--lead li::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: #d6ae54;
+  box-shadow: 0 0 0 4px rgba(212, 170, 76, 0.08);
+}
+
+.astrology-welcome-reading-dot {
+  width: 5px;
+  height: 5px;
+  margin-top: 8px;
+  border-radius: 50%;
+  background: rgba(214, 174, 84, 0.68);
+}
+
+.astrology-welcome-reading--fallback {
+  padding: 18px;
+}
+
+.astrology-welcome-reading--fallback .astrology-welcome-reading-list--lead {
+  margin-top: 0;
+}
+
+.astrology-welcome-result-footnote {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 1px;
+  padding: 11px 2px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.astrology-welcome-result-footnote > span {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 50%;
+  color: rgba(214, 174, 84, 0.68);
+  font-size: 9px;
+}
+
+.astrology-welcome-result-footnote p {
+  margin: 0;
+  color: rgba(244, 238, 225, 0.38);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+/* Specific question field */
+.astrology-welcome-field textarea {
+  width: 100%;
+  min-height: 94px;
+  padding: 13px 14px;
+  resize: vertical;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 12px;
+  outline: none;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025));
+  color: #f4eee1;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  transition: border-color 0.22s ease, background 0.22s ease, box-shadow 0.22s ease;
+}
+
+.astrology-welcome-field textarea::placeholder {
+  color: rgba(244, 238, 225, 0.30);
+}
+
+.astrology-welcome-field textarea:hover {
+  border-color: rgba(212, 170, 76, 0.30);
+  background: linear-gradient(145deg, rgba(212, 170, 76, 0.055), rgba(255, 255, 255, 0.025));
+}
+
+.astrology-welcome-field textarea:focus {
+  border-color: rgba(212, 170, 76, 0.62);
+  background: linear-gradient(145deg, rgba(212, 170, 76, 0.075), rgba(255, 255, 255, 0.025));
+  box-shadow: 0 0 0 3px rgba(212, 170, 76, 0.075), 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+@media (max-width: 560px) {
+  .astrology-welcome-result-heading--premium {
+    gap: 11px;
+  }
+
+  .astrology-welcome-result-mark {
+    flex-basis: 39px;
+    width: 39px;
+    height: 39px;
+    border-radius: 12px;
+    font-size: 17px;
+  }
+
+  .astrology-welcome-result-heading--premium h3 {
+    font-size: 20px;
+  }
+
+  .astrology-welcome-question-card p {
+    font-size: 11px;
+  }
+
+  .astrology-welcome-reading-main {
+    padding: 16px 14px 15px;
+  }
+
+  .astrology-welcome-reading-section {
+    padding: 14px 13px;
+  }
+
+  .astrology-welcome-reading-main h4 {
+    font-size: 18px;
+  }
+
+  .astrology-welcome-reading-section-heading h4 {
+    font-size: 13px;
+  }
+
+  .astrology-welcome-reading-list li {
+    font-size: 11.5px;
+    line-height: 1.6;
+  }
+
+  .astrology-welcome-reading-list--lead li {
+    font-size: 12px;
+  }
+}

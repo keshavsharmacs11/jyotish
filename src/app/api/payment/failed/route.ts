@@ -1,26 +1,99 @@
-import { NextResponse } from "next/server";
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server";
 
-import clientPromise from "@/lib/mongodb";
+import {
+  connectMongoose,
+} from "@/lib/mongodb";
+
 import Booking from "@/models/Booking";
 import Payment from "@/models/Payment";
 
+import {
+  releaseSlotHold,
+} from "@/lib/slotHold";
+
+import {
+  checkRateLimit,
+} from "@/lib/rateLimit";
+
+import {
+  getClientIp,
+} from "@/lib/requestSecurity";
+
 export async function POST(
-  request: Request
+  request: NextRequest
 ) {
   try {
+    /*
+     * ==========================================
+     * RATE LIMIT
+     * ==========================================
+     */
+
+    const clientIp =
+      getClientIp(request);
+
+    const rateLimit =
+      await checkRateLimit({
+        key:
+          `payment-failed-ip:${clientIp}`,
+        limit: 20,
+        windowMs:
+          15 * 60 * 1000,
+      });
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Too many payment requests. Please try again later.",
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After":
+              String(
+                rateLimit.retryAfterSeconds
+              ),
+          },
+        }
+      );
+    }
+
+    /*
+     * ==========================================
+     * READ REQUEST
+     * ==========================================
+     */
+
     const body =
       await request.json();
 
-    const {
-      bookingId,
-      razorpayOrderId,
-      razorpayPaymentId,
-    } = body;
+    const bookingId =
+      typeof body.bookingId ===
+      "string"
+        ? body.bookingId.trim()
+        : "";
+
+    const razorpayOrderId =
+      typeof body.razorpayOrderId ===
+      "string"
+        ? body.razorpayOrderId.trim()
+        : "";
+
+    const razorpayPaymentId =
+      typeof body.razorpayPaymentId ===
+      "string"
+        ? body.razorpayPaymentId.trim()
+        : "";
 
     /*
-     * ============================================
+     * ==========================================
      * VALIDATION
-     * ============================================
+     * ==========================================
      */
 
     if (
@@ -33,27 +106,41 @@ export async function POST(
           error:
             "Missing payment failure details.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      bookingId.length > 200 ||
+      razorpayOrderId.length > 200 ||
+      razorpayPaymentId.length > 200
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Invalid payment failure request.",
+        },
+        {
+          status: 400,
+        }
       );
     }
 
     /*
-     * ============================================
-     * DATABASE CONNECTION
-     * ============================================
+     * ==========================================
+     * DATABASE
+     * ==========================================
      */
 
-    const client =
-      await clientPromise;
-
-    await client
-      .db("codepunkdb")
-      .command({ ping: 1 });
+    await connectMongoose();
 
     /*
-     * ============================================
+     * ==========================================
      * FIND BOOKING
-     * ============================================
+     * ==========================================
      */
 
     const booking =
@@ -68,14 +155,16 @@ export async function POST(
           error:
             "Booking not found.",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
     }
 
     /*
-     * ============================================
-     * SECURITY CHECK
-     * ============================================
+     * ==========================================
+     * ORDER ↔ BOOKING
+     * ==========================================
      */
 
     if (
@@ -88,14 +177,16 @@ export async function POST(
           error:
             "Razorpay order does not match booking.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
     /*
-     * ============================================
+     * ==========================================
      * FIND PAYMENT
-     * ============================================
+     * ==========================================
      */
 
     const payment =
@@ -110,17 +201,38 @@ export async function POST(
           error:
             "Payment record not found.",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
     }
 
     /*
-     * ============================================
-     * DON'T MODIFY A SUCCESSFUL PAYMENT
-     * ============================================
-     *
-     * A late failure notification must never
-     * overwrite an already successful payment.
+     * ==========================================
+     * PAYMENT ↔ BOOKING
+     * ==========================================
+     */
+
+    if (
+      payment.bookingId.toString() !==
+      booking._id.toString()
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Payment does not belong to this booking.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    /*
+     * ==========================================
+     * SUCCESSFUL PAYMENT IS IMMUTABLE HERE
+     * ==========================================
      */
 
     if (
@@ -135,15 +247,65 @@ export async function POST(
     }
 
     /*
-     * ============================================
+     * ==========================================
+     * PREVENT DOWNGRADING A STRONGER STATE
+     * ==========================================
+     */
+
+    if (
+      booking.status ===
+        "completed" ||
+      booking.status ===
+        "consultant_assigned"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "This booking is already in a completed processing state.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    /*
+     * ==========================================
+     * PAYMENT ID CONSISTENCY
+     * ==========================================
+     */
+
+    if (
+      payment.razorpayPaymentId &&
+      razorpayPaymentId &&
+      payment.razorpayPaymentId !==
+        razorpayPaymentId
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Payment ID does not match the existing payment record.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    /*
+     * ==========================================
      * UPDATE PAYMENT
-     * ============================================
+     * ==========================================
      */
 
     payment.status =
       "failed";
 
-    if (razorpayPaymentId) {
+    if (
+      razorpayPaymentId
+    ) {
       payment.razorpayPaymentId =
         razorpayPaymentId;
     }
@@ -151,9 +313,9 @@ export async function POST(
     await payment.save();
 
     /*
-     * ============================================
+     * ==========================================
      * UPDATE BOOKING
-     * ============================================
+     * ==========================================
      */
 
     booking.paymentStatus =
@@ -162,7 +324,9 @@ export async function POST(
     booking.status =
       "payment_pending";
 
-    if (razorpayPaymentId) {
+    if (
+      razorpayPaymentId
+    ) {
       booking.razorpayPaymentId =
         razorpayPaymentId;
     }
@@ -170,9 +334,33 @@ export async function POST(
     await booking.save();
 
     /*
-     * ============================================
-     * RESPONSE
-     * ============================================
+     * ==========================================
+     * RELEASE TEMPORARY SLOT HOLD
+     * ==========================================
+     */
+
+    if (
+      booking.consultantId
+    ) {
+      await releaseSlotHold({
+        consultantId:
+          booking.consultantId,
+
+        date:
+          booking.date,
+
+        time:
+          booking.time,
+
+        bookingId:
+          booking.bookingId,
+      });
+    }
+
+    /*
+     * ==========================================
+     * SUCCESS
+     * ==========================================
      */
 
     return NextResponse.json({
@@ -190,10 +378,17 @@ export async function POST(
       bookingStatus:
         booking.status,
     });
-  } catch (error) {
+  } catch {
+    /*
+     * Never expose or log:
+     * - payment IDs
+     * - order IDs
+     * - customer data
+     * - request body
+     */
+
     console.error(
-      "Failed payment update error:",
-      error
+      "FAILED PAYMENT UPDATE"
     );
 
     return NextResponse.json(
@@ -202,7 +397,9 @@ export async function POST(
         error:
           "Unable to update failed payment.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }

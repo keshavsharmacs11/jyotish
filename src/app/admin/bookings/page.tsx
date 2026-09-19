@@ -32,6 +32,9 @@ type Booking = {
   status: string;
   paymentStatus: string;
 
+  refundStatus?: "pending" | "processed" | "failed" | null;
+  razorpayRefundId?: string | null;
+
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
 
@@ -181,6 +184,14 @@ export default function AdminBookingsPage() {
     setRefundMessage,
   ] = useState("");
 
+  const [refundPolling, setRefundPolling] =
+    useState(false);
+
+  const [
+    reconcilingRefund,
+    setReconcilingRefund,
+  ] = useState(false);
+
   /*
    * ============================================
    * INITIAL LOAD
@@ -191,6 +202,72 @@ export default function AdminBookingsPage() {
     loadBookings();
     loadConsultants();
   }, []);
+
+  /*
+   * ============================================
+   * REFUND STATUS POLLING
+   * ============================================
+   *
+   * Razorpay confirmation arrives asynchronously
+   * through the webhook. While the selected booking
+   * is pending, refresh the booking data periodically
+   * so the detail panel changes to Refunded without
+   * requiring a manual page refresh.
+   *
+   * The database remains the source of truth.
+   * ============================================
+   */
+  useEffect(() => {
+    if (
+      !showDetails ||
+      !selectedBooking ||
+      selectedBooking.refundStatus !== "pending"
+    ) {
+      setRefundPolling(false);
+      return;
+    }
+
+    let active = true;
+    let attempts = 0;
+    const maxAttempts = 60;
+
+    setRefundPolling(true);
+
+    const pollRefundStatus = async () => {
+      if (!active) {
+        return;
+      }
+
+      attempts += 1;
+
+      try {
+        await loadBookings();
+      } catch (error) {
+        console.error(
+          "REFUND STATUS POLLING ERROR:",
+          error
+        );
+      }
+
+      if (!active || attempts >= maxAttempts) {
+        setRefundPolling(false);
+      }
+    };
+
+    const intervalId = window.setInterval(
+      pollRefundStatus,
+      5000
+    );
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      setRefundPolling(false);
+    };
+  }, [
+    showDetails,
+    selectedBooking?.refundStatus,
+  ]);
 
   /*
    * ============================================
@@ -226,9 +303,24 @@ export default function AdminBookingsPage() {
         );
       }
 
-      setBookings(
+      const normalizedBookings: Booking[] = (
         data.bookings || []
-      );
+      ).map((booking: Booking) => ({
+        ...booking,
+        customer: booking.customer || {
+          fullName: "",
+          mobile: "",
+          email: "",
+        },
+        refundStatus:
+          booking.paymentStatus === "refunded"
+            ? "processed"
+            : booking.refundStatus || null,
+        razorpayRefundId:
+          booking.razorpayRefundId || null,
+      }));
+
+      setBookings(normalizedBookings);
 
       /*
        * Keep detail panel synchronized
@@ -237,7 +329,7 @@ export default function AdminBookingsPage() {
 
       if (selectedBooking) {
         const updatedBooking =
-          (data.bookings || []).find(
+          normalizedBookings.find(
             (booking: Booking) =>
               booking._id ===
               selectedBooking._id
@@ -349,17 +441,17 @@ export default function AdminBookingsPage() {
               .includes(
                 normalizedSearch
               ) ||
-            booking.customer.fullName
+            (booking.customer?.fullName || "")
               .toLowerCase()
               .includes(
                 normalizedSearch
               ) ||
-            booking.customer.email
+            (booking.customer?.email || "")
               .toLowerCase()
               .includes(
                 normalizedSearch
               ) ||
-            booking.customer.mobile
+            (booking.customer?.mobile || "")
               .toLowerCase()
               .includes(
                 normalizedSearch
@@ -549,7 +641,19 @@ export default function AdminBookingsPage() {
 
       if (updatedBooking) {
         setSelectedBooking(
-          updatedBooking
+          (previousBooking) => {
+            if (!previousBooking) {
+              return updatedBooking;
+            }
+
+            return {
+              ...previousBooking,
+              ...updatedBooking,
+              customer:
+                updatedBooking.customer ||
+                previousBooking.customer,
+            };
+          }
         );
 
         setSelectedConsultantId(
@@ -665,7 +769,19 @@ export default function AdminBookingsPage() {
 
       if (data.booking) {
         setSelectedBooking(
-          data.booking
+          (previousBooking) => {
+            if (!previousBooking) {
+              return data.booking;
+            }
+
+            return {
+              ...previousBooking,
+              ...data.booking,
+              customer:
+                data.booking.customer ||
+                previousBooking.customer,
+            };
+          }
         );
 
         setSelectedStatus(
@@ -709,174 +825,438 @@ export default function AdminBookingsPage() {
       return;
     }
 
-    /*
-     * Only paid bookings can be refunded.
-     */
-
-    if (
-      selectedBooking.paymentStatus !==
-      "paid"
-    ) {
+    if (selectedBooking.refundStatus === "pending") {
       setRefundMessage(
-        "Only paid bookings can be refunded."
+        "A refund request is already processing. Please wait for Razorpay confirmation."
       );
-
       return;
     }
 
-    /*
-     * Completed consultations cannot
-     * use the normal refund flow.
-     */
-
-    if (
-      selectedBooking.status ===
-      "completed"
-    ) {
+    if (selectedBooking.refundStatus === "processed") {
       setRefundMessage(
-        "A completed consultation cannot be refunded through this flow."
+        "This booking has already been refunded successfully."
       );
-
       return;
     }
 
+  /*
+   * ============================================
+   * ONLY PAID BOOKINGS CAN BE REFUNDED
+   * ============================================
+   */
+
+  if (
+    selectedBooking.paymentStatus !==
+    "paid"
+  ) {
+    setRefundMessage(
+      "Only paid bookings can be refunded."
+    );
+
+    return;
+  }
+
+  /*
+   * ============================================
+   * COMPLETED BOOKINGS
+   * ============================================
+   */
+
+  if (
+    selectedBooking.status ===
+    "completed"
+  ) {
+    setRefundMessage(
+      "A completed consultation cannot be refunded through this flow."
+    );
+
+    return;
+  }
+
+  /*
+   * ============================================
+   * ALREADY CANCELLED
+   * ============================================
+   */
+
+  if (
+    selectedBooking.status ===
+    "cancelled"
+  ) {
+    setRefundMessage(
+      "This booking has already been cancelled."
+    );
+
+    return;
+  }
+
+  /*
+   * ============================================
+   * CONFIRMATION
+   * ============================================
+   */
+
+  const confirmed =
+    window.confirm(
+      `Are you sure you want to cancel booking ${selectedBooking.bookingId} and issue a full refund of ${formatAmount(
+        selectedBooking.price,
+        selectedBooking.currency
+      )}?`
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    setRefunding(true);
+    setRefundMessage("");
+
     /*
-     * Already cancelled bookings should
-     * not be refunded again.
+     * ==========================================
+     * CALL REFUND API
+     * ==========================================
      */
 
-    if (
-      selectedBooking.status ===
-      "cancelled"
-    ) {
-      setRefundMessage(
-        "This booking has already been cancelled."
+    const response =
+      await fetch(
+        "/api/admin/bookings/refund",
+        {
+          method: "POST",
+
+          credentials: "include",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            bookingId:
+              selectedBooking.bookingId,
+
+            reason:
+              "Cancelled by administrator",
+          }),
+        }
       );
 
-      return;
+    /*
+     * ==========================================
+     * SAFELY READ RESPONSE
+     * ==========================================
+     *
+     * This prevents the frontend from crashing
+     * if the server ever returns HTML instead
+     * of JSON.
+     */
+
+    const contentType =
+      response.headers.get(
+        "content-type"
+      ) || "";
+
+    let data: any = null;
+
+    if (
+      contentType.includes(
+        "application/json"
+      )
+    ) {
+      data =
+        await response.json();
+    } else {
+      const text =
+        await response.text();
+
+      console.error(
+        "REFUND API RETURNED NON-JSON:",
+        {
+          status:
+            response.status,
+
+          statusText:
+            response.statusText,
+
+          body:
+            text.slice(0, 500),
+        }
+      );
+
+      throw new Error(
+        `Refund API returned an unexpected response (${response.status}).`
+      );
     }
 
     /*
-     * Confirmation before real money movement.
+     * ==========================================
+     * API ERROR
+     * ==========================================
      */
 
-    const confirmed =
-      window.confirm(
-        `Are you sure you want to cancel booking ${selectedBooking.bookingId} and issue a full refund of ${formatAmount(
-          selectedBooking.price,
-          selectedBooking.currency
-        )}?`
+    if (
+      !response.ok ||
+      !data?.success
+    ) {
+      throw new Error(
+        data?.error ||
+          "Unable to process refund."
+      );
+    }
+
+    /*
+     * ==========================================
+     * IMPORTANT:
+     *
+     * The refund API intentionally returns only
+     * part of the booking.
+     *
+     * DO NOT replace selectedBooking with
+     * data.booking directly.
+     *
+     * Instead merge the API response into the
+     * existing complete booking.
+     *
+     * This preserves:
+     *
+     * customer
+     * service
+     * consultant
+     * date
+     * time
+     * price
+     * etc.
+     * ==========================================
+     */
+
+    if (data.booking) {
+      setSelectedBooking(
+        (previousBooking) => {
+          if (!previousBooking) {
+            return previousBooking;
+          }
+
+          return {
+            ...previousBooking,
+
+            ...data.booking,
+
+            /*
+             * Preserve nested customer object
+             * because refund API does not return it.
+             */
+
+            customer:
+              data.booking.customer ||
+              previousBooking.customer,
+
+            refundStatus:
+              data.booking.paymentStatus === "refunded"
+                ? "processed"
+                : data.refund?.status ||
+                  data.booking.refundStatus ||
+                  previousBooking.refundStatus ||
+                  null,
+
+            razorpayRefundId:
+              data.refund?.refundId ||
+              data.booking.razorpayRefundId ||
+              previousBooking.razorpayRefundId ||
+              null,
+          };
+        }
       );
 
-    if (!confirmed) {
+      setSelectedStatus(
+        data.booking.status ||
+          "cancelled"
+      );
+
+      /*
+       * Preserve the existing consultant ID
+       * if the refund API doesn't return it.
+       */
+
+      if (
+        data.booking.consultantId
+      ) {
+        setSelectedConsultantId(
+          data.booking.consultantId
+        );
+      }
+    } else if (data.refund) {
+      setSelectedBooking(
+        (previousBooking) =>
+          previousBooking
+            ? {
+                ...previousBooking,
+                refundStatus:
+                  data.refund.status ||
+                  (previousBooking.paymentStatus === "refunded"
+                    ? "processed"
+                    : previousBooking.refundStatus || null),
+                razorpayRefundId:
+                  data.refund.refundId ||
+                  previousBooking.razorpayRefundId ||
+                  null,
+              }
+            : previousBooking
+      );
+    }
+
+    /*
+     * ==========================================
+     * REFRESH BOOKINGS
+     * ==========================================
+     *
+     * The database remains the source of truth.
+     *
+     * This will retrieve the complete booking
+     * including customer information.
+     * ==========================================
+     */
+
+    await loadBookings();
+
+    /*
+     * ==========================================
+     * SUCCESS MESSAGE
+     * ==========================================
+     */
+
+    if (
+      data.refunded === true
+    ) {
+      setRefundMessage(
+        "Booking cancelled and refund processed successfully."
+      );
+    } else {
+      setRefundMessage(
+        "Refund request submitted successfully. Waiting for Razorpay confirmation."
+      );
+    }
+  } catch (error) {
+    console.error(
+      "REFUND BOOKING ERROR:",
+      error
+    );
+
+    setRefundMessage(
+      error instanceof Error
+        ? error.message
+        : "Unable to process refund."
+    );
+  } finally {
+    setRefunding(false);
+  }
+}
+
+  /*
+   * ============================================
+   * RECONCILE REFUND WITH RAZORPAY
+   * ============================================
+   *
+   * Used when Razorpay already shows the refund as
+   * processed but our local Payment record is still
+   * pending. This endpoint only reads the existing
+   * Razorpay refund and synchronizes our database.
+   */
+  async function reconcileRefund() {
+    if (!selectedBooking) {
+      return;
+    }
+
+    if (selectedBooking.refundStatus !== "pending") {
+      setRefundMessage(
+        "This refund is no longer pending."
+      );
+      return;
+    }
+
+    if (!selectedBooking.razorpayRefundId) {
+      setRefundMessage(
+        "No Razorpay Refund ID is available for reconciliation."
+      );
       return;
     }
 
     try {
-      setRefunding(true);
+      setReconcilingRefund(true);
       setRefundMessage("");
 
-      const response =
-        await fetch(
-          "/api/admin/bookings/refund",
+      const response = await fetch(
+        "/api/admin/bookings/reconcile-refund",
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            bookingId: selectedBooking.bookingId,
+          }),
+        }
+      );
+
+      const contentType =
+        response.headers.get("content-type") || "";
+
+      let data: any = null;
+
+      if (contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+
+        console.error(
+          "RECONCILE REFUND API RETURNED NON-JSON:",
           {
-            method: "POST",
-
-            credentials:
-              "include",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body: JSON.stringify({
-              bookingId:
-                selectedBooking.bookingId,
-
-              reason:
-                "Cancelled by administrator",
-            }),
+            status: response.status,
+            statusText: response.statusText,
+            body: text.slice(0, 500),
           }
         );
 
-      const data =
-        await response.json();
+        throw new Error(
+          "Refund reconciliation returned an unexpected server response."
+        );
+      }
 
-      if (
-        !response.ok ||
-        !data.success
-      ) {
+      if (!response.ok || !data.success) {
         throw new Error(
           data.error ||
-            "Unable to process refund."
+            "Unable to reconcile the refund with Razorpay."
         );
       }
-
-      /*
-       * Update selected booking
-       * immediately.
-       */
-
-      if (data.booking) {
-        setSelectedBooking(
-          data.booking
-        );
-
-        setSelectedStatus(
-          data.booking.status
-        );
-
-        setSelectedConsultantId(
-          data.booking.consultantId ||
-            ""
-        );
-      } else {
-        /*
-         * Fallback in case the API returns
-         * success without the complete booking.
-         */
-
-        setSelectedBooking(
-          (current) =>
-            current
-              ? {
-                  ...current,
-                  status:
-                    "cancelled",
-                  paymentStatus:
-                    "refunded",
-                }
-              : current
-        );
-
-        setSelectedStatus(
-          "cancelled"
-        );
-      }
-
-      /*
-       * Refresh complete booking list.
-       */
 
       await loadBookings();
 
-      setRefundMessage(
-        "Booking cancelled and full refund processed successfully."
-      );
+      if (data.status === "processed") {
+        setRefundMessage(
+          "Refund status synchronized successfully. The refund is processed."
+        );
+      } else if (data.status === "failed") {
+        setRefundMessage(
+          "Razorpay reports that this refund failed."
+        );
+      } else {
+        setRefundMessage(
+          "Razorpay still reports this refund as pending."
+        );
+      }
     } catch (error) {
       console.error(
-        "REFUND BOOKING ERROR:",
+        "RECONCILE REFUND ERROR:",
         error
       );
 
       setRefundMessage(
         error instanceof Error
           ? error.message
-          : "Unable to process refund."
+          : "Unable to reconcile the refund."
       );
     } finally {
-      setRefunding(false);
+      setReconcilingRefund(false);
     }
   }
 
@@ -953,6 +1333,137 @@ export default function AdminBookingsPage() {
         (letter) =>
           letter.toUpperCase()
       );
+  }
+
+  /*
+   * ============================================
+   * EXCEL-READY EXPORT
+   * ============================================
+   *
+   * CSV is intentionally generated in the browser so there is
+   * no new backend/export endpoint to maintain. Excel opens CSV
+   * files directly, and the export contains the complete booking
+   * record rather than only the columns visible in the compact UI.
+   */
+  function csvCell(value: unknown) {
+    const text =
+      value === null || value === undefined
+        ? ""
+        : String(value);
+
+    return `"${text.replaceAll('"', '""')}"`;
+  }
+
+  function excelReadyValue(value: unknown) {
+    if (value === null || value === undefined || value === "") {
+      return "";
+    }
+
+    return value;
+  }
+
+  function downloadExcelReadyBookings() {
+    if (bookings.length === 0) {
+      return;
+    }
+
+    const headers = [
+      "Booking ID",
+      "Date",
+      "Time",
+      "Customer Name",
+      "Mobile",
+      "Email",
+      "Service",
+      "Category",
+      "Mode",
+      "Consultant",
+      "Price",
+      "Currency",
+      "Payment Status",
+      "Booking Status",
+      "Refund Status",
+      "Razorpay Order ID",
+      "Razorpay Payment ID",
+      "Razorpay Refund ID",
+      "Date of Birth",
+      "Birth Time",
+      "Birth Place",
+      "Gender",
+      "Concern",
+      "Language",
+      "Current Name",
+      "Person 2 Name",
+      "Person 2 Date of Birth",
+      "Person 2 Birth Time",
+      "Person 2 Birth Place",
+      "Tarot Question",
+      "Created At",
+      "Updated At",
+    ];
+
+    const rows = bookings.map((booking) => [
+      booking.bookingId,
+      booking.date,
+      booking.time,
+      booking.customer?.fullName,
+      booking.customer?.mobile,
+      booking.customer?.email,
+      booking.serviceName,
+      booking.category,
+      booking.mode === "video" ? "Video" : "Voice",
+      booking.consultantName || "",
+      excelReadyValue(booking.price),
+      booking.currency || "INR",
+      statusLabel(booking.paymentStatus),
+      statusLabel(booking.status),
+      booking.refundStatus || "",
+      booking.razorpayOrderId || "",
+      booking.razorpayPaymentId || "",
+      booking.razorpayRefundId || "",
+      booking.customer?.dob || "",
+      booking.customer?.birthTime || "",
+      booking.customer?.birthPlace || "",
+      booking.customer?.gender || "",
+      booking.customer?.concern || "",
+      booking.customer?.language || "",
+      booking.customer?.currentName || "",
+      booking.customer?.person2Name || "",
+      booking.customer?.person2Dob || "",
+      booking.customer?.person2BirthTime || "",
+      booking.customer?.person2BirthPlace || "",
+      booking.customer?.tarotQuestion || "",
+      booking.createdAt,
+      booking.updatedAt,
+    ]);
+
+    const csv =
+      [headers, ...rows]
+        .map((row) => row.map(csvCell).join(","))
+        .join("\r\n");
+
+    const bom = "\uFEFF";
+    const blob = new Blob([bom + csv], {
+      type: "text/csv;charset=utf-8;",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const stamp = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+      .format(new Date())
+      .replaceAll("-", "");
+
+    anchor.href = url;
+    anchor.download = `akshaanshh-jyotish-bookings-${stamp}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
   }
 
   /*
@@ -1223,13 +1734,25 @@ export default function AdminBookingsPage() {
 
               </div>
 
-              <span className="admin-bookings-live">
+              <div className="admin-bookings-table-header-actions">
+                <span className="admin-bookings-live">
 
-                <i />
+                  <i />
 
-                Live data
+                  Live data
 
-              </span>
+                </span>
+
+                <button
+                  type="button"
+                  className="admin-bookings-export"
+                  onClick={downloadExcelReadyBookings}
+                  disabled={bookings.length === 0}
+                  title="Download every booking as an Excel-ready CSV"
+                >
+                  ↓ Excel-ready CSV
+                </button>
+              </div>
 
             </div>
 
@@ -1252,7 +1775,8 @@ export default function AdminBookingsPage() {
 
               </div>
             ) : (
-              <div className="admin-bookings-table">
+              <div className="admin-bookings-table-scroll" tabIndex={0} aria-label="Scrollable bookings list">
+                <div className="admin-bookings-table">
 
                 <div className="admin-bookings-row admin-bookings-row-heading">
 
@@ -1438,11 +1962,82 @@ export default function AdminBookingsPage() {
                   )
                 )}
 
+                </div>
               </div>
             )}
 
           </section>
         )}
+
+      {/* ==========================================
+          EXCEL-READY BOOKING REGISTER
+      ========================================== */}
+
+      {!loading && !error && bookings.length > 0 && (
+        <section className="admin-bookings-export-card">
+          <div className="admin-bookings-export-header">
+            <div>
+              <span className="admin-bookings-export-eyebrow">
+                EXCEL-READY REGISTER
+              </span>
+              <h2>All bookings at a glance</h2>
+              <p>
+                This register is generated automatically from the same live booking data above.
+                Use the CSV button to open the complete record in Excel.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="admin-bookings-export-primary"
+              onClick={downloadExcelReadyBookings}
+            >
+              Download all bookings ↓
+            </button>
+          </div>
+
+          <div className="admin-bookings-register-scroll" tabIndex={0} aria-label="Scrollable Excel-ready booking register">
+            <table className="admin-bookings-register-table">
+              <thead>
+                <tr>
+                  <th>Booking ID</th>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Customer</th>
+                  <th>Mobile</th>
+                  <th>Email</th>
+                  <th>Service</th>
+                  <th>Consultant</th>
+                  <th>Mode</th>
+                  <th>Amount</th>
+                  <th>Payment</th>
+                  <th>Status</th>
+                  <th>Refund</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bookings.map((booking) => (
+                  <tr key={`register-${booking._id}`}>
+                    <td>{booking.bookingId}</td>
+                    <td>{formatDate(booking.date)}</td>
+                    <td>{booking.time}</td>
+                    <td>{booking.customer?.fullName || "—"}</td>
+                    <td>{booking.customer?.mobile || "—"}</td>
+                    <td>{booking.customer?.email || "—"}</td>
+                    <td>{booking.serviceName || "—"}</td>
+                    <td>{booking.consultantName || "Unassigned"}</td>
+                    <td>{booking.mode === "video" ? "Video" : "Voice"}</td>
+                    <td>{formatAmount(booking.price, booking.currency)}</td>
+                    <td>{statusLabel(booking.paymentStatus)}</td>
+                    <td>{statusLabel(booking.status)}</td>
+                    <td>{booking.refundStatus || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* ==========================================
           BOOKING DETAIL PANEL
@@ -1877,6 +2472,177 @@ export default function AdminBookingsPage() {
                 </div>
 
                 {/* ==================================
+                    REFUND PROCESSING
+                ================================== */}
+
+            {selectedBooking.refundStatus ===
+            "pending" && (
+            <div className="admin-detail-section">
+                <div className="admin-detail-section-title">
+                Refund Processing
+                </div>
+
+                <div
+                style={{
+                    padding: "16px",
+                    borderRadius: "8px",
+                    background: "#fff8e8",
+                    color: "#8a5a00",
+                    fontSize: "14px",
+                    lineHeight: 1.6,
+                }}
+                >
+                <div
+                    style={{
+                    fontWeight: 600,
+                    marginBottom: "6px",
+                    }}
+                >
+                    Refund has been submitted successfully.
+                </div>
+
+                <div>
+                    Razorpay is currently processing the
+                    refund. This page is checking the refund
+                    status automatically and will change to
+                    <strong>Refunded</strong> when Razorpay
+                    confirms the final refund status.
+                </div>
+
+                {selectedBooking.razorpayRefundId && (
+                    <div
+                    style={{
+                        marginTop: "12px",
+                        paddingTop: "10px",
+                        borderTop: "1px solid #ead9ae",
+                        fontSize: "13px",
+                    }}
+                    >
+                    <strong>Razorpay Refund ID:</strong>{" "}
+                    <span
+                        style={{
+                        fontFamily:
+                            "monospace",
+                        wordBreak:
+                            "break-all",
+                        }}
+                    >
+                        {selectedBooking.razorpayRefundId}
+                    </span>
+                    </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={reconcileRefund}
+                  disabled={
+                    reconcilingRefund ||
+                    !selectedBooking.razorpayRefundId
+                  }
+                  style={{
+                    marginTop: "14px",
+                    width: "100%",
+                    padding: "11px 14px",
+                    borderRadius: "8px",
+                    border: "1px solid #c08a16",
+                    background: "#fff",
+                    color: "#8a5a00",
+                    fontWeight: 600,
+                    cursor:
+                      reconcilingRefund ||
+                      !selectedBooking.razorpayRefundId
+                        ? "not-allowed"
+                        : "pointer",
+                    opacity:
+                      reconcilingRefund ||
+                      !selectedBooking.razorpayRefundId
+                        ? 0.65
+                        : 1,
+                  }}
+                >
+                  {reconcilingRefund
+                    ? "Syncing with Razorpay..."
+                    : "Sync Refund Status with Razorpay →"}
+                </button>
+                </div>
+            </div>
+            )}
+
+
+                  {refundPolling && (
+                    <div
+                      style={{
+                        marginTop: "10px",
+                        fontSize: "12px",
+                        opacity: 0.8,
+                      }}
+                    >
+                      Checking Razorpay refund status…
+                    </div>
+                  )}
+
+            {selectedBooking.refundStatus ===
+            "failed" && (
+            <div className="admin-detail-section">
+                <div className="admin-detail-section-title">
+                Refund Failed
+                </div>
+
+                <div
+                style={{
+                    padding: "16px",
+                    borderRadius: "8px",
+                    background: "#fff1f1",
+                    color: "#b42318",
+                    fontSize: "14px",
+                    lineHeight: 1.6,
+                }}
+                >
+                <div
+                    style={{
+                    fontWeight: 600,
+                    marginBottom: "6px",
+                    }}
+                >
+                    Razorpay could not complete the refund.
+                </div>
+
+                <div>
+                    The original payment remains paid.
+                    You can review the issue and retry the
+                    refund using the button below.
+                </div>
+
+                {selectedBooking.razorpayRefundId && (
+                    <div
+                    style={{
+                        marginTop: "12px",
+                        paddingTop: "10px",
+                        borderTop:
+                        "1px solid #f0caca",
+                        fontSize: "13px",
+                    }}
+                    >
+                    <strong>
+                        Razorpay Refund ID:
+                    </strong>{" "}
+                    <span
+                        style={{
+                        fontFamily:
+                            "monospace",
+                        wordBreak:
+                            "break-all",
+                        }}
+                    >
+                        {selectedBooking.razorpayRefundId}
+                    </span>
+                    </div>
+                )}
+                </div>
+            </div>
+            )}
+
+                {/* ==================================
                     CANCELLATION & REFUND
                 ================================== */}
 
@@ -1885,7 +2651,11 @@ export default function AdminBookingsPage() {
                   selectedBooking.status !==
                     "completed" &&
                   selectedBooking.status !==
-                    "cancelled" && (
+                    "cancelled" &&
+                  selectedBooking.refundStatus !==
+                    "pending" &&
+                  selectedBooking.refundStatus !==
+                    "processed" && (
                     <div className="admin-detail-section">
 
                       <div className="admin-detail-section-title">
@@ -1910,45 +2680,52 @@ export default function AdminBookingsPage() {
                             lineHeight:
                               1.6,
                             color:
-                              "#666",
+                              selectedBooking.refundStatus ===
+                              "failed"
+                                ? "#b42318"
+                                : "#666",
                           }}
                         >
-                          Cancelling this
-                          booking will
-                          issue a full
-                          refund of{" "}
-                          <strong>
-                            {formatAmount(
-                              selectedBooking.price,
-                              selectedBooking.currency
-                            )}
-                          </strong>{" "}
-                          to the
-                          customer
-                          through
-                          Razorpay.
+                          {selectedBooking.refundStatus ===
+                          "failed"
+                            ? "The previous refund attempt failed. You can safely retry the full refund."
+                            : "Cancelling this booking will issue a full refund of "}
+                          {selectedBooking.refundStatus !==
+                            "failed" && (
+                            <>
+                              <strong>
+                                {formatAmount(
+                                  selectedBooking.price,
+                                  selectedBooking.currency
+                                )}
+                              </strong>{" "}
+                              to the customer through Razorpay.
+                            </>
+                          )}
                         </p>
 
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          onClick={
-                            refundBooking
-                          }
-                          disabled={
-                            refunding
-                          }
-                          style={{
-                            background:
-                              "#b42318",
-                            borderColor:
-                              "#b42318",
-                          }}
-                        >
-                          {refunding
-                            ? "Processing Refund..."
-                            : "Cancel & Refund Booking →"}
-                        </button>
+                     {selectedBooking.refundStatus !== "pending" &&
+  selectedBooking.refundStatus !== "processed" &&
+  selectedBooking.status !== "cancelled" &&
+  selectedBooking.status !== "completed" && (
+    <button
+      type="button"
+      className="btn btn-primary"
+      onClick={refundBooking}
+      disabled={refunding}
+      style={{
+        background: "#b42318",
+        borderColor: "#b42318",
+      }}
+    >
+      {refunding
+        ? "Processing Refund..."
+        : selectedBooking.refundStatus ===
+          "failed"
+        ? "Retry Refund →"
+        : "Cancel & Refund Booking →"}
+    </button>
+  )}
 
                         {refundMessage && (
                           <div
@@ -1986,41 +2763,78 @@ export default function AdminBookingsPage() {
                     REFUND RESULT
                 ================================== */}
 
-                {selectedBooking.paymentStatus ===
-                  "refunded" && (
-                  <div className="admin-detail-section">
+               {/* ==================================
+    REFUND RESULT
+================================== */}
 
-                    <div className="admin-detail-section-title">
-                      Refund
-                    </div>
+        {(selectedBooking.refundStatus ===
+        "processed" ||
+        selectedBooking.paymentStatus ===
+            "refunded") && (
+        <div className="admin-detail-section">
 
-                    <div
-                      style={{
-                        padding:
-                          "14px",
-                        borderRadius:
-                          "8px",
-                        background:
-                          "#eefbf3",
-                        color:
-                          "#137333",
-                        fontSize:
-                          "14px",
-                        lineHeight:
-                          1.6,
-                      }}
-                    >
-                      This booking has
-                      been refunded
-                      successfully.
-                    </div>
+            <div className="admin-detail-section-title">
+            Refund
+            </div>
 
-                  </div>
-                )}
+            <div
+            style={{
+                padding: "16px",
+                borderRadius: "8px",
+                background: "#eefbf3",
+                color: "#137333",
+                fontSize: "14px",
+                lineHeight: 1.6,
+            }}
+            >
+            <div
+                style={{
+                fontWeight: 600,
+                marginBottom: "6px",
+                }}
+            >
+                Refund processed successfully.
+            </div>
 
+            <div>
+                Razorpay has confirmed that the
+                refund was successfully processed.
+                This booking has been cancelled and
+                the payment has been marked as refunded.
+            </div>
+
+            {selectedBooking.razorpayRefundId && (
+                <div
+                style={{
+                    marginTop: "12px",
+                    paddingTop: "10px",
+                    borderTop:
+                    "1px solid #cce8d5",
+                    fontSize: "13px",
+                }}
+                >
+                <strong>
+                    Razorpay Refund ID:
+                </strong>{" "}
+                <span
+                    style={{
+                    fontFamily:
+                        "monospace",
+                    wordBreak:
+                        "break-all",
+                    }}
+                >
+                    {selectedBooking.razorpayRefundId}
+                </span>
+                </div>
+            )}
+            </div>
+
+        </div>
+        )}
                 {/* ==================================
                     CLIENT
-                ================================== */}
+                ==== ============================== */}
 
                 <div className="admin-detail-section">
 
@@ -2032,9 +2846,9 @@ export default function AdminBookingsPage() {
 
                     <div className="admin-booking-avatar large">
 
-                      {selectedBooking.customer.fullName
-                        .charAt(0)
-                        .toUpperCase()}
+                    {selectedBooking.customer?.fullName
+                    ?.charAt(0)
+                    ?.toUpperCase() || "C"}
 
                     </div>
 

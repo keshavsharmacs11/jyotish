@@ -8,6 +8,17 @@ import Payment from "@/models/Payment";
 import Consultant from "@/models/Consultant";
 
 export async function GET() {
+  /*
+   * This endpoint is intended only for local/development
+   * database diagnostics. It must never expose database
+   * connectivity information or model details in production.
+   */
+  if (process.env.NODE_ENV === "production") {
+    return new NextResponse(null, {
+      status: 404,
+    });
+  }
+
   try {
     const client = await clientPromise;
 

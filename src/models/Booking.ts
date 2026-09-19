@@ -4,6 +4,12 @@ import mongoose, {
   Model,
 } from "mongoose";
 
+/*
+ * =========================================================
+ * BOOKING STATUS
+ * =========================================================
+ */
+
 export type BookingStatus =
   | "payment_pending"
   | "paid"
@@ -12,15 +18,33 @@ export type BookingStatus =
   | "completed"
   | "cancelled";
 
+/*
+ * =========================================================
+ * PAYMENT STATUS
+ * =========================================================
+ */
+
 export type PaymentStatus =
   | "pending"
   | "paid"
   | "failed"
   | "refunded";
 
+/*
+ * =========================================================
+ * BOOKING MODE
+ * =========================================================
+ */
+
 export type BookingMode =
   | "video"
   | "voice";
+
+/*
+ * =========================================================
+ * BOOKING INTERFACE
+ * =========================================================
+ */
 
 export interface IBooking
   extends Document {
@@ -28,51 +52,105 @@ export interface IBooking
 
   userId?: mongoose.Types.ObjectId | null;
 
+  /*
+   * SERVICE
+   */
+
   serviceId: string;
 
   serviceName: string;
   category: string;
+
+  /*
+   * CONSULTATION
+   */
 
   mode: BookingMode;
 
   date: string;
   time: string;
 
+  /*
+   * CONSULTANT
+   */
+
   consultantId?: mongoose.Types.ObjectId | null;
   consultantName?: string;
 
+  /*
+   * CUSTOMER
+   */
+
   customer: {
     fullName: string;
+
     dob?: string;
     birthTime?: string;
     birthPlace?: string;
     gender?: string;
+
     mobile: string;
     email: string;
+
     concern?: string;
     language?: string;
+
     currentName?: string;
+
     person2Name?: string;
     person2Dob?: string;
     person2BirthTime?: string;
     person2BirthPlace?: string;
+
     tarotQuestion?: string;
   };
+
+  /*
+   * PRICE SNAPSHOT
+   */
 
   price: number;
 
   currency: string;
 
+  /*
+   * BOOKING STATUS
+   */
+
   status: BookingStatus;
 
+  /*
+   * PAYMENT STATUS
+   */
+
   paymentStatus: PaymentStatus;
+
+  /*
+   * REFUND
+   */
+
+  refundReason?: string;
+
+  /*
+   * RAZORPAY
+   */
 
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
 
+  /*
+   * TIMESTAMPS
+   */
+
   createdAt: Date;
   updatedAt: Date;
 }
+
+/*
+ * =========================================================
+ * BOOKING SCHEMA
+ * =========================================================
+ */
 
 const BookingSchema =
   new Schema<IBooking>(
@@ -133,7 +211,10 @@ const BookingSchema =
 
       mode: {
         type: String,
-        enum: ["video", "voice"],
+        enum: [
+          "video",
+          "voice",
+        ],
         required: true,
       },
 
@@ -304,18 +385,19 @@ const BookingSchema =
       },
 
       /*
- * =========================================
- * REFUND REASON
- * =========================================
- *
- * Stores why the business cancelled the
- * booking and initiated a refund.
- */
+       * =========================================
+       * REFUND REASON
+       * =========================================
+       *
+       * Stores the reason provided by the
+       * administrator when cancelling/refunding
+       * a paid booking.
+       */
 
-refundReason: {
-  type: String,
-  default: "",
-},
+      refundReason: {
+        type: String,
+        default: "",
+      },
 
       /*
        * =========================================
@@ -335,6 +417,13 @@ refundReason: {
         index: true,
       },
     },
+
+    /*
+     * =========================================
+     * SCHEMA OPTIONS
+     * =========================================
+     */
+
     {
       timestamps: true,
     }
@@ -346,19 +435,35 @@ refundReason: {
  * =========================================================
  *
  * A consultant/date/time combination becomes unique
- * ONLY after the booking has been successfully paid.
+ * ONLY when paymentStatus is "paid".
  *
  * Therefore:
  *
- * payment_pending → does not block slot
- * paid            → blocks slot
- * confirmed       → blocks slot
- * consultant_assigned → blocks slot
- * completed       → blocks slot
- * refunded        → releases slot
+ * payment_pending
+ *      -> does NOT block the slot
+ *
+ * paid
+ *      -> blocks the slot
+ *
+ * confirmed
+ *      -> blocks the slot
+ *
+ * consultant_assigned
+ *      -> blocks the slot
+ *
+ * completed
+ *      -> blocks the slot
+ *
+ * refunded
+ *      -> releases the slot because paymentStatus
+ *         becomes "refunded"
+ *
+ * cancelled unpaid
+ *      -> does NOT block the slot
  *
  * This protects against two customers successfully
  * paying for the exact same consultant/time slot.
+ * =========================================================
  */
 
 BookingSchema.index(
@@ -371,16 +476,35 @@ BookingSchema.index(
     unique: true,
 
     partialFilterExpression: {
-      paymentStatus: "paid",
       consultantId: {
         $exists: true,
+      },
+
+      paymentStatus: "paid",
+
+      status: {
+        $in: [
+          "paid",
+          "confirmed",
+          "consultant_assigned",
+        ],
       },
     },
 
     name:
-      "unique_paid_consultant_time_slot",
+      "unique_active_paid_consultant_time_slot",
   }
 );
+
+/*
+ * =========================================================
+ * MODEL
+ * =========================================================
+ *
+ * Prevent model recompilation during Next.js development
+ * and hot reload.
+ * =========================================================
+ */
 
 const Booking: Model<IBooking> =
   mongoose.models.Booking ||

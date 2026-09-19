@@ -1,10 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
 import clientPromise from "@/lib/mongodb";
 import User from "@/models/User";
+import { requireAdmin } from "@/lib/adminAuth";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request);
+
+  if (!auth.authorized) {
+    return auth.response;
+  }
+
   try {
     const body = await request.json();
 
@@ -26,12 +33,12 @@ export async function POST(request: Request) {
       );
     }
 
-    if (password.length < 8) {
+    if (password.length < 12) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "Admin password must be at least 8 characters long.",
+            "Admin password must be at least 12 characters long.",
         },
         { status: 400 }
       );
@@ -47,7 +54,7 @@ export async function POST(request: Request) {
     const client = await clientPromise;
 
     await client
-      .db("codepunkdb")
+      .db()
       .command({ ping: 1 });
 
     /*
@@ -99,6 +106,7 @@ export async function POST(request: Request) {
         passwordHash,
 
         role: "admin",
+        consultantProfileEligible: false,
       });
 
     console.log(

@@ -1,0 +1,468 @@
+.page {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 18px;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(214, 166, 59, 0.12), transparent 32%),
+    radial-gradient(circle at 85% 85%, rgba(67, 104, 149, 0.1), transparent 35%),
+    #f6f4ef;
+  color: #172033;
+}
+
+.glowOne,
+.glowTwo {
+  position: fixed;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  filter: blur(60px);
+  pointer-events: none;
+}
+
+.glowOne {
+  top: -170px;
+  left: -100px;
+  background: rgba(214, 166, 59, 0.1);
+}
+
+.glowTwo {
+  right: -140px;
+  bottom: -160px;
+  background: rgba(55, 81, 116, 0.08);
+}
+
+.card {
+  position: relative;
+  z-index: 1;
+  width: min(760px, 100%);
+  padding: 38px;
+  border: 1px solid rgba(20, 27, 45, 0.09);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 28px 80px rgba(20, 27, 45, 0.09);
+  backdrop-filter: blur(18px);
+}
+
+.brandRow {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 34px;
+}
+
+.brandMark {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #172033;
+  color: #e1b84f;
+  font-size: 20px;
+}
+
+.brandName {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+}
+
+.brandSub {
+  margin-top: 2px;
+  color: #9b7120;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+}
+
+.eyebrow {
+  margin-bottom: 9px;
+  color: #a5751c;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+}
+
+.card h1 {
+  margin: 0;
+  max-width: 620px;
+  font-family: Georgia, serif;
+  font-size: clamp(2rem, 5vw, 3.1rem);
+  font-weight: 500;
+  line-height: 1.06;
+  color: #121a2b;
+}
+
+.lead {
+  margin: 14px 0 28px;
+  max-width: 650px;
+  color: #5f6675;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.form {
+  display: grid;
+  gap: 18px;
+}
+
+.invitationBox,
+.successBox,
+.submitNote,
+.loadingBox,
+.errorBox {
+  border-radius: 15px;
+}
+
+.invitationBox {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(214, 166, 59, 0.22);
+  background: rgba(250, 247, 239, 0.78);
+}
+
+.invitationBox div {
+  min-width: 0;
+}
+
+.invitationBox span {
+  display: block;
+  margin-bottom: 5px;
+  color: #8c8f97;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.invitationBox strong {
+  display: block;
+  overflow: hidden;
+  color: #192033;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  margin-top: 8px;
+  padding-top: 17px;
+  border-top: 1px solid rgba(20, 27, 45, 0.07);
+}
+
+.sectionHeading > span {
+  display: grid;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 10px;
+  background: #172033;
+  color: #e1b84f;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.sectionHeading h2 {
+  margin: 1px 0 3px;
+  color: #172033;
+  font-size: 16px;
+}
+
+.sectionHeading p {
+  margin: 0;
+  color: #7a7f89;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+}
+
+.field > span {
+  color: #363d4e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.field input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid rgba(20, 27, 45, 0.11);
+  border-radius: 12px;
+  outline: none;
+  background: #fff;
+  color: #172033;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.field input:focus {
+  border-color: rgba(172, 120, 25, 0.55);
+  box-shadow: 0 0 0 3px rgba(214, 166, 59, 0.1);
+}
+
+.field input:disabled,
+.field input[readonly] {
+  background: #f5f4f0;
+  color: #747986;
+}
+
+.photoArea {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px;
+  border: 1px dashed rgba(20, 27, 45, 0.13);
+  border-radius: 16px;
+}
+
+.photoPreview {
+  width: 112px;
+  height: 112px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #f1efe9;
+  color: #9296a0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.photoPreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photoCopy {
+  display: grid;
+  gap: 7px;
+}
+
+.photoCopy strong {
+  color: #242c3c;
+  font-size: 14px;
+}
+
+.photoCopy p {
+  margin: 0;
+  color: #858a95;
+  font-size: 12px;
+}
+
+.photoCopy input {
+  max-width: 260px;
+  font-size: 12px;
+}
+
+.modeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.modeButton {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 60px;
+  padding: 12px 14px;
+  border: 1px solid rgba(20, 27, 45, 0.1);
+  border-radius: 14px;
+  background: #fff;
+  color: #283044;
+  text-align: left;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.modeButton:hover {
+  transform: translateY(-1px);
+  border-color: rgba(214, 166, 59, 0.4);
+}
+
+.modeSelected {
+  border-color: rgba(172, 120, 25, 0.5);
+  background: rgba(250, 247, 239, 0.8);
+}
+
+.modeIcon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: #172033;
+  color: #e1b84f;
+  font-size: 12px;
+}
+
+.modeButton > span:nth-child(2) {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.modeCheck {
+  color: #a5751c;
+  font-weight: 800;
+}
+
+.submitNote {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 13px 14px;
+  background: #f7f6f2;
+  color: #6c717d;
+}
+
+.submitNote > span {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #172033;
+  color: #e1b84f;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.submitNote p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.submit {
+  min-height: 54px;
+  border: 0;
+  border-radius: 13px;
+  background: #172033;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.submit:hover:not(:disabled) {
+  background: #222d43;
+  transform: translateY(-1px);
+}
+
+.submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.errorBox {
+  padding: 13px 14px;
+  border: 1px solid rgba(166, 57, 57, 0.15);
+  background: rgba(166, 57, 57, 0.06);
+  color: #933535;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.loadingBox {
+  padding: 24px;
+  border: 1px solid rgba(20, 27, 45, 0.07);
+  background: #f8f7f3;
+  color: #707681;
+  text-align: center;
+  font-size: 13px;
+}
+
+.successBox {
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid rgba(82, 120, 92, 0.18);
+  background: rgba(82, 120, 92, 0.07);
+}
+
+.successBox > span {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: #2f6340;
+  color: #fff;
+  font-weight: 800;
+}
+
+.successBox strong {
+  display: block;
+  color: #274831;
+  font-size: 13px;
+}
+
+.successBox p {
+  margin: 4px 0 0;
+  color: #607263;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.footer {
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(20, 27, 45, 0.06);
+  color: #a1a4ab;
+  font-size: 10px;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .page {
+    align-items: flex-start;
+    padding: 16px 12px;
+  }
+
+  .card {
+    padding: 24px 18px;
+    border-radius: 21px;
+  }
+
+  .brandRow {
+    margin-bottom: 28px;
+  }
+
+  .invitationBox,
+  .modeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .photoArea {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .photoCopy input {
+    max-width: 100%;
+  }
+}

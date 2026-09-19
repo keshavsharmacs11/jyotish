@@ -1,30 +1,31 @@
+"use client";
+
 import FadeIn from "@/components/ui/FadeIn";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function Process() {
+  const { t } = useLanguage();
+
   const steps = [
     {
       number: "01",
-      title: "Choose Your Service",
-      description:
-        "Select the consultation service that best matches your requirements.",
+      title: t("home.process.step1.title"),
+      description: t("home.process.step1.description"),
     },
     {
       number: "02",
-      title: "Book Your Slot",
-      description:
-        "Choose a convenient date and time for your consultation.",
+      title: t("home.process.step2.title"),
+      description: t("home.process.step2.description"),
     },
     {
       number: "03",
-      title: "Connect With Our Expert",
-      description:
-        "Join your consultation through your preferred communication method.",
+      title: t("home.process.step3.title"),
+      description: t("home.process.step3.description"),
     },
     {
       number: "04",
-      title: "Receive Personalized Guidance",
-      description:
-        "Get practical insights and recommendations tailored to your situation.",
+      title: t("home.process.step4.title"),
+      description: t("home.process.step4.description"),
     },
   ];
 
@@ -32,15 +33,20 @@ export default function Process() {
     <FadeIn>
       <section className="section">
         <div className="site-container">
-          <p className="eyebrow">HOW IT WORKS</p>
+          <p className="eyebrow">
+            {t("home.process.eyebrow")}
+          </p>
 
           <h2 className="section-heading">
-            Book Your Consultation in Four Simple Steps
+            {t("home.process.title")}
           </h2>
 
           <div className="process-grid">
-            {steps.map((step) => (
-              <div key={step.number} className="process-card">
+            {steps.map((step, index) => (
+              <article
+                key={step.number}
+                className="process-card"
+              >
                 <div className="process-number">
                   {step.number}
                 </div>
@@ -48,7 +54,14 @@ export default function Process() {
                 <h3>{step.title}</h3>
 
                 <p>{step.description}</p>
-              </div>
+
+                {index < steps.length - 1 && (
+                  <span
+                    className="process-connector"
+                    aria-hidden="true"
+                  />
+                )}
+              </article>
             ))}
           </div>
         </div>

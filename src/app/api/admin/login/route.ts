@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     }
 
     const normalizedEmail =
-      email.trim().toLowerCase();
+      String(email).trim().toLowerCase();
 
     /*
      * ============================================
@@ -63,18 +63,18 @@ export async function POST(request: Request) {
      * ============================================
      */
 
-const client = await clientPromise;
+    const client = await clientPromise;
 
-await client
-  .db("codepunkdb")
-  .command({ ping: 1 });
+    await client
+      .db()
+      .command({ ping: 1 });
 
-/*
- * Connect Mongoose before using
- * Mongoose models such as User.
- */
+    /*
+     * Connect Mongoose before using
+     * Mongoose models such as User.
+     */
 
-await connectMongoose();
+    await connectMongoose();
 
     /*
      * ============================================
@@ -113,6 +113,28 @@ await connectMongoose();
           success: false,
           error:
             "You do not have permission to access the admin panel.",
+        },
+        { status: 403 }
+      );
+    }
+
+    /*
+     * ============================================
+     * CHECK ADMIN ACCOUNT STATUS
+     * ============================================
+     *
+     * Existing administrator records created before
+     * the active field was introduced may have
+     * active === undefined. Those accounts remain
+     * active for backward compatibility.
+     */
+
+    if (user.active === false) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Your administrator access has been revoked. Please contact the Super Administrator.",
         },
         { status: 403 }
       );

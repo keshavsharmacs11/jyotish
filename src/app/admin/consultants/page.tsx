@@ -1,5 +1,9 @@
 "use client";
 
+import ConsultantAvailabilityCalendar from "@/components/admin/ConsultantAvailabilityCalendar";
+import ConsultantInviteManager from "@/components/admin/ConsultantInviteManager";
+import { isSlotInFutureIST } from "@/lib/bookingTime";
+
 import {
   useEffect,
   useMemo,
@@ -21,6 +25,11 @@ type Consultant = {
   photo?: string;
   availableModes: ("video" | "voice")[];
   availability: Availability[];
+  availabilityWindows?: {
+    date: string;
+    startTime: string;
+    endTime: string;
+  }[];
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -48,6 +57,82 @@ const initialForm: ConsultantForm = {
   photo: "",
 };
 
+/*
+ * The main consultant account is protected from
+ * the normal Remove Profile action.
+ *
+ * This is also enforced by the server-side API.
+ */
+const PROTECTED_CONSULTANT_EMAIL =
+  "info.akshaanshhjyotish@gmail.com";
+
+/*
+ * Count only dates that currently contain at least one
+ * future availability start time.
+ *
+ * New availabilityWindows are the primary source of truth.
+ * Legacy availability is used only when no new windows exist.
+ */
+function countFutureAvailabilityDates(
+  consultant: Consultant
+) {
+  const futureDates = new Set<string>();
+
+  for (
+    const window of
+      consultant.availabilityWindows ?? []
+  ) {
+    const date =
+      String(window?.date ?? "").trim();
+
+    const startTime =
+      String(window?.startTime ?? "").trim();
+
+    if (
+      date &&
+      isSlotInFutureIST(
+        date,
+        startTime
+      )
+    ) {
+      futureDates.add(date);
+    }
+  }
+
+  if (
+    futureDates.size === 0 &&
+    (!consultant.availabilityWindows ||
+      consultant.availabilityWindows.length === 0)
+  ) {
+    for (
+      const item of
+        consultant.availability ?? []
+    ) {
+      const date =
+        String(item?.date ?? "").trim();
+
+      if (!date) {
+        continue;
+      }
+
+      const hasFutureTime =
+        (item.times ?? []).some(
+          (time) =>
+            isSlotInFutureIST(
+              date,
+              String(time).trim()
+            )
+        );
+
+      if (hasFutureTime) {
+        futureDates.add(date);
+      }
+    }
+  }
+
+  return futureDates.size;
+}
+
 export default function AdminConsultantsPage() {
   /*
    * ============================================
@@ -63,6 +148,9 @@ export default function AdminConsultantsPage() {
 
   const [error, setError] =
     useState("");
+
+  const [isSuperAdmin, setIsSuperAdmin] =
+    useState(false);
 
   const [search, setSearch] =
     useState("");
@@ -104,21 +192,6 @@ export default function AdminConsultantsPage() {
 
   /*
    * ============================================
-   * AVAILABILITY
-   * ============================================
-   */
-
-  const [availability, setAvailability] =
-    useState<Availability[]>([]);
-
-  const [newDate, setNewDate] =
-    useState("");
-
-  const [timeInputs, setTimeInputs] =
-    useState<Record<string, string>>({});
-
-  /*
-   * ============================================
    * FORM SCROLL REF
    * ============================================
    */
@@ -134,7 +207,40 @@ export default function AdminConsultantsPage() {
 
   useEffect(() => {
     loadConsultants();
+    loadAdminIdentity();
   }, []);
+
+  async function loadAdminIdentity() {
+    try {
+      const response = await fetch(
+        "/api/admin/me",
+        {
+          cache: "no-store",
+          credentials: "include",
+        }
+      );
+
+      if (!response.ok) {
+        return;
+      }
+
+      const data =
+        await response.json();
+
+      if (data.success) {
+        setIsSuperAdmin(
+          Boolean(
+            data.admin?.isSuperAdmin
+          )
+        );
+      }
+    } catch (identityError) {
+      console.error(
+        "Admin identity error:",
+        identityError
+      );
+    }
+  }
 
   async function loadConsultants() {
     try {
@@ -145,6 +251,7 @@ export default function AdminConsultantsPage() {
         "/api/admin/consultants",
         {
           cache: "no-store",
+          credentials: "include",
         }
       );
 
@@ -326,10 +433,6 @@ export default function AdminConsultantsPage() {
       return;
     }
 
-    /*
-     * Only images
-     */
-
     if (
       !file.type.startsWith(
         "image/"
@@ -341,10 +444,6 @@ export default function AdminConsultantsPage() {
 
       return;
     }
-
-    /*
-     * Limit original upload size
-     */
 
     if (
       file.size >
@@ -431,12 +530,6 @@ export default function AdminConsultantsPage() {
 
     setPhotoPreview("");
 
-    setAvailability([]);
-
-    setNewDate("");
-
-    setTimeInputs({});
-
     setFormError("");
 
     setShowForm(true);
@@ -500,23 +593,6 @@ export default function AdminConsultantsPage() {
       consultant.photo || ""
     );
 
-    setAvailability(
-      consultant.availability
-        ? consultant.availability.map(
-            (item) => ({
-              date: item.date,
-              times: [
-                ...(item.times || []),
-              ],
-            })
-          )
-        : []
-    );
-
-    setNewDate("");
-
-    setTimeInputs({});
-
     setFormError("");
 
     setShowForm(true);
@@ -552,209 +628,12 @@ export default function AdminConsultantsPage() {
 
     setPhotoPreview("");
 
-    setAvailability([]);
-
-    setNewDate("");
-
-    setTimeInputs({});
-
     if (
       photoInputRef.current
     ) {
       photoInputRef.current.value =
         "";
     }
-  }
-
-  /*
-   * ============================================
-   * ADD AVAILABILITY DATE
-   * ============================================
-   */
-
-  function addAvailabilityDate() {
-    if (!newDate) {
-      setFormError(
-        "Please select an availability date."
-      );
-
-      return;
-    }
-
-    const alreadyExists =
-      availability.some(
-        (item) =>
-          item.date ===
-          newDate
-      );
-
-    if (alreadyExists) {
-      setFormError(
-        "This date has already been added."
-      );
-
-      return;
-    }
-
-    setAvailability(
-      [
-        ...availability,
-        {
-          date: newDate,
-          times: [],
-        },
-      ].sort((a, b) =>
-        a.date.localeCompare(
-          b.date
-        )
-      )
-    );
-
-    setNewDate("");
-
-    setFormError("");
-  }
-
-  /*
-   * ============================================
-   * REMOVE AVAILABILITY DATE
-   * ============================================
-   */
-
-  function removeAvailabilityDate(
-    date: string
-  ) {
-    setAvailability(
-      availability.filter(
-        (item) =>
-          item.date !== date
-      )
-    );
-
-    setTimeInputs(
-      (current) => {
-        const updated = {
-          ...current,
-        };
-
-        delete updated[date];
-
-        return updated;
-      }
-    );
-  }
-
-  /*
-   * ============================================
-   * CHANGE TIME INPUT
-   * ============================================
-   */
-
-  function updateTimeInput(
-    date: string,
-    time: string
-  ) {
-    setTimeInputs(
-      (current) => ({
-        ...current,
-        [date]: time,
-      })
-    );
-  }
-
-  /*
-   * ============================================
-   * ADD TIME SLOT
-   * ============================================
-   */
-
-  function addTimeSlot(
-    date: string
-  ) {
-    const time =
-      timeInputs[date] || "";
-
-    if (!time) {
-      setFormError(
-        "Please select a time."
-      );
-
-      return;
-    }
-
-    setAvailability(
-      availability.map(
-        (item) => {
-          if (
-            item.date !==
-            date
-          ) {
-            return item;
-          }
-
-          if (
-            item.times.includes(
-              time
-            )
-          ) {
-            return item;
-          }
-
-          return {
-            ...item,
-
-            times: [
-              ...item.times,
-              time,
-            ].sort(),
-          };
-        }
-      )
-    );
-
-    setTimeInputs(
-      (current) => ({
-        ...current,
-        [date]: "",
-      })
-    );
-
-    setFormError("");
-  }
-
-  /*
-   * ============================================
-   * REMOVE TIME SLOT
-   * ============================================
-   */
-
-  function removeTimeSlot(
-    date: string,
-    time: string
-  ) {
-    setAvailability(
-      availability.map(
-        (item) => {
-          if (
-            item.date !==
-            date
-          ) {
-            return item;
-          }
-
-          return {
-            ...item,
-
-            times:
-              item.times.filter(
-                (itemTime) =>
-                  itemTime !==
-                  time
-              ),
-          };
-        }
-      )
-    );
   }
 
   /*
@@ -799,10 +678,6 @@ export default function AdminConsultantsPage() {
 
       setFormError("");
 
-      /*
-       * FRONTEND VALIDATION
-       */
-
       if (
         !form.name.trim() ||
         !form.email.trim() ||
@@ -823,10 +698,6 @@ export default function AdminConsultantsPage() {
         );
       }
 
-      /*
-       * PHOTO REQUIRED FOR NEW CONSULTANT
-       */
-
       if (
         !editingConsultant &&
         !form.photo
@@ -835,34 +706,6 @@ export default function AdminConsultantsPage() {
           "Please upload a consultant photo."
         );
       }
-
-      /*
-       * NORMALIZE AVAILABILITY
-       */
-
-      const cleanedAvailability =
-        availability
-          .map(
-            (item) => ({
-              date:
-                item.date,
-
-              times: [
-                ...new Set(
-                  item.times
-                ),
-              ].sort(),
-            })
-          )
-          .sort((a, b) =>
-            a.date.localeCompare(
-              b.date
-            )
-          );
-
-      /*
-       * BUILD REQUEST
-       */
 
       const payload = {
         name:
@@ -891,15 +734,12 @@ export default function AdminConsultantsPage() {
         ],
 
         availability:
-          cleanedAvailability,
+          editingConsultant?.availability ??
+          [],
 
         active:
           form.active,
       };
-
-      /*
-       * CREATE / UPDATE
-       */
 
       const url =
         editingConsultant
@@ -921,6 +761,9 @@ export default function AdminConsultantsPage() {
               "Content-Type":
                 "application/json",
             },
+
+            credentials:
+              "include",
 
             body: JSON.stringify(
               payload
@@ -945,15 +788,7 @@ export default function AdminConsultantsPage() {
         );
       }
 
-      /*
-       * REFRESH
-       */
-
       await loadConsultants();
-
-      /*
-       * CLOSE
-       */
 
       closeForm();
     } catch (error) {
@@ -974,7 +809,124 @@ export default function AdminConsultantsPage() {
 
   /*
    * ============================================
-   * FILTER CONSULTANTS
+   * REMOVE CONSULTANT PROFILE
+   * ============================================
+   *
+   * This is a soft removal.
+   *
+   * The consultant record remains in MongoDB
+   * so historical bookings and references are
+   * preserved.
+   *
+   * The API changes active to false.
+   *
+   * The protected main consultant cannot be
+   * removed.
+   */
+
+  async function removeConsultant(
+    consultant: Consultant
+  ) {
+    if (saving) {
+      return;
+    }
+
+    const consultantEmail =
+      consultant.email
+        .trim()
+        .toLowerCase();
+
+    if (
+      consultantEmail ===
+      PROTECTED_CONSULTANT_EMAIL
+    ) {
+      setError(
+        "The main consultant account cannot be removed."
+      );
+
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        `Remove ${consultant.name} from the consultant profiles?\n\nThe consultant will disappear from the active consultant list. Historical booking records will be preserved.`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError("");
+
+      const response =
+        await fetch(
+          `/api/admin/consultants/${consultant._id}`,
+          {
+            method: "DELETE",
+            credentials: "include",
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.error ||
+            "Unable to remove consultant profile."
+        );
+      }
+
+      await loadConsultants();
+
+      if (
+        editingConsultant?._id ===
+        consultant._id
+      ) {
+        closeForm();
+      }
+    } catch (error) {
+      console.error(
+        "Remove consultant error:",
+        error
+      );
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Unable to remove consultant profile."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /*
+   * ============================================
+   * ACTIVE CONSULTANTS
+   * ============================================
+   *
+   * Removed/inactive consultant records remain
+   * in the database but are excluded from the
+   * normal active consultant management list.
+   */
+
+  const activeConsultants =
+    useMemo(() => {
+      return consultants.filter(
+        (consultant) =>
+          consultant.active
+      );
+    }, [consultants]);
+
+  /*
+   * ============================================
+   * FILTER ACTIVE CONSULTANTS
    * ============================================
    */
 
@@ -986,10 +938,10 @@ export default function AdminConsultantsPage() {
           .toLowerCase();
 
       if (!value) {
-        return consultants;
+        return activeConsultants;
       }
 
-      return consultants.filter(
+      return activeConsultants.filter(
         (consultant) =>
           consultant.name
             .toLowerCase()
@@ -1005,7 +957,7 @@ export default function AdminConsultantsPage() {
             .includes(value)
       );
     }, [
-      consultants,
+      activeConsultants,
       search,
     ]);
 
@@ -1015,23 +967,15 @@ export default function AdminConsultantsPage() {
    * ============================================
    */
 
-  const activeCount =
-    consultants.filter(
-      (consultant) =>
-        consultant.active
-    ).length;
+  const activeConsultantsCount =
+    activeConsultants.length;
 
   const totalAvailabilityDates =
-    consultants.reduce(
-      (
-        total,
-        consultant
-      ) =>
+    activeConsultants.reduce(
+      (total, consultant) =>
         total +
-        (
+        countFutureAvailabilityDates(
           consultant
-            .availability
-            ?.length || 0
         ),
       0
     );
@@ -1096,19 +1040,38 @@ export default function AdminConsultantsPage() {
         <button
           type="button"
           className="admin-consultants-add"
-          onClick={
-            openAddForm
-          }
+          onClick={() => {
+            document
+              .getElementById("consultant-invite-manager")
+              ?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              });
+          }}
+          disabled={saving}
         >
           <span>
             +
           </span>
 
-          Add Consultant
+          Invite Consultant
         </button>
 
       </div>
 
+
+      <ConsultantInviteManager
+        onManualAdd={openAddForm}
+      />
+
+
+      <ConsultantAvailabilityCalendar
+        consultants={activeConsultants}
+        onEditConsultant={openEditForm}
+        onConsultantsRefresh={
+          loadConsultants
+        }
+      />
 
       {/* ======================================
           FORM
@@ -1564,181 +1527,44 @@ export default function AdminConsultantsPage() {
                   </label>
 
                   <small>
-                    Availability belongs
-                    to this consultant
-                    and can be used
-                    across services.
+                    Availability is managed above.
+                    Changes to the schedule are saved
+                    separately from consultant profile
+                    details.
                   </small>
 
                 </div>
 
               </div>
 
+              <div className="admin-consultant-calendar-management-note">
 
-              <div className="admin-consultant-availability-add">
+                <strong>
+                  Schedule managed in Availability Manager
+                </strong>
 
-                <input
-                  type="date"
-                  value={
-                    newDate
-                  }
-                  onChange={(
-                    event
-                  ) =>
-                    setNewDate(
-                      event
-                        .target
-                        .value
-                    )
-                  }
-                />
+                <span>
+                  Use the manager above for dates,
+                  time windows and repeat schedules.
+                  Your existing profile save still
+                  preserves legacy availability data
+                  for compatibility.
+                </span>
 
                 <button
                   type="button"
-                  onClick={
-                    addAvailabilityDate
+                  onClick={() =>
+                    window.scrollTo({
+                      top: 0,
+                      behavior: "smooth",
+                    })
                   }
+                  disabled={saving}
                 >
-                  + Add Date
+                  Open Availability Manager ↑
                 </button>
 
               </div>
-
-
-              {availability.length ===
-              0 ? (
-                <div className="admin-consultant-availability-empty">
-                  No availability
-                  dates added yet.
-                </div>
-              ) : (
-
-                <div className="admin-consultant-availability-list">
-
-                  {availability.map(
-                    (
-                      item
-                    ) => (
-
-                      <div
-                        key={
-                          item.date
-                        }
-                        className="admin-consultant-availability-item"
-                      >
-
-                        <div className="admin-consultant-availability-date">
-
-                          <strong>
-                            {formatDate(
-                              item.date
-                            )}
-                          </strong>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              removeAvailabilityDate(
-                                item.date
-                              )
-                            }
-                          >
-                            Remove Date
-                          </button>
-
-                        </div>
-
-
-                        <div className="admin-consultant-time-add">
-
-                          <input
-                            type="time"
-                            value={
-                              timeInputs[
-                                item.date
-                              ] ||
-                              ""
-                            }
-                            onChange={(
-                              event
-                            ) =>
-                              updateTimeInput(
-                                item.date,
-                                event
-                                  .target
-                                  .value
-                              )
-                            }
-                          />
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              addTimeSlot(
-                                item.date
-                              )
-                            }
-                          >
-                            + Add Time
-                          </button>
-
-                        </div>
-
-
-                        <div className="admin-consultant-time-slots">
-
-                          {item.times.length ===
-                          0 ? (
-
-                            <span>
-                              No time slots
-                              added yet.
-                            </span>
-
-                          ) : (
-
-                            item.times.map(
-                              (
-                                time
-                              ) => (
-
-                                <button
-                                  key={
-                                    time
-                                  }
-                                  type="button"
-                                  onClick={() =>
-                                    removeTimeSlot(
-                                      item.date,
-                                      time
-                                    )
-                                  }
-                                  title="Remove time"
-                                >
-
-                                  {time}
-
-                                  <b>
-                                    ×
-                                  </b>
-
-                                </button>
-
-                              )
-                            )
-
-                          )}
-
-                        </div>
-
-                      </div>
-
-                    )
-                  )}
-
-                </div>
-
-              )}
 
             </div>
 
@@ -1753,12 +1579,25 @@ export default function AdminConsultantsPage() {
                 Visibility
               </label>
 
-              <label className="admin-consultant-checkbox">
+              <label
+                className={`admin-consultant-checkbox ${
+                  !isSuperAdmin &&
+                  editingConsultant
+                    ? "is-restricted"
+                    : ""
+                }`}
+              >
 
                 <input
                   type="checkbox"
                   checked={
                     form.active
+                  }
+                  disabled={
+                    Boolean(
+                      editingConsultant
+                    ) &&
+                    !isSuperAdmin
                   }
                   onChange={(
                     event
@@ -1774,12 +1613,19 @@ export default function AdminConsultantsPage() {
                 />
 
                 <span>
-                  Make this consultant
-                  available to
-                  customers
+                  Make this consultant available to customers
                 </span>
 
               </label>
+
+              {editingConsultant &&
+                !isSuperAdmin && (
+                  <small className="admin-consultant-visibility-restricted">
+                    Only the Super Administrator
+                    can deactivate or reactivate
+                    a consultant profile.
+                  </small>
+                )}
 
             </div>
 
@@ -1848,6 +1694,7 @@ export default function AdminConsultantsPage() {
             onClick={
               loadConsultants
             }
+            disabled={saving}
           >
             Try Again
           </button>
@@ -1873,13 +1720,12 @@ export default function AdminConsultantsPage() {
 
               <strong>
                 {
-                  consultants.length
+                  activeConsultantsCount
                 }
               </strong>
 
               <small>
-                All configured
-                consultants
+                Active consultant profiles
               </small>
 
             </div>
@@ -1893,13 +1739,12 @@ export default function AdminConsultantsPage() {
 
               <strong>
                 {
-                  activeCount
+                  activeConsultantsCount
                 }
               </strong>
 
               <small>
-                Available to
-                customers
+                Available to customers
               </small>
 
             </div>
@@ -1918,7 +1763,7 @@ export default function AdminConsultantsPage() {
               </strong>
 
               <small>
-                Across all consultants
+                Across active consultants
               </small>
 
             </div>
@@ -1964,6 +1809,7 @@ export default function AdminConsultantsPage() {
               onClick={
                 loadConsultants
               }
+              disabled={saving}
             >
               ↻ Refresh
             </button>
@@ -1982,7 +1828,7 @@ export default function AdminConsultantsPage() {
               <div>
 
                 <span>
-                  CONSULTANTS
+                  ACTIVE CONSULTANTS
                 </span>
 
                 <strong>
@@ -2013,7 +1859,7 @@ export default function AdminConsultantsPage() {
                 </div>
 
                 <h3>
-                  No consultants found
+                  No active consultants found
                 </h3>
 
                 <p>
@@ -2071,232 +1917,255 @@ export default function AdminConsultantsPage() {
                     {filteredConsultants.map(
                       (
                         consultant
-                      ) => (
+                      ) => {
 
-                        <tr
-                          key={
-                            consultant._id
-                          }
-                        >
+                        const isProtectedConsultant =
+                          consultant.email
+                            .trim()
+                            .toLowerCase() ===
+                          PROTECTED_CONSULTANT_EMAIL;
 
-                          {/* CONSULTANT + PHOTO */}
+                        return (
+                          <tr
+                            key={
+                              consultant._id
+                            }
+                          >
 
-                          <td>
+                            {/* CONSULTANT + PHOTO */}
 
-                            <div
-                              className="admin-consultant-name"
-                              style={{
-                                display:
-                                  "flex",
-                                alignItems:
-                                  "center",
-                                gap:
-                                  "12px",
-                              }}
-                            >
-
-                              {consultant.photo ? (
-                                <img
-                                  src={
-                                    consultant.photo
-                                  }
-                                  alt={
-                                    consultant.name
-                                  }
-                                  style={{
-                                    width:
-                                      "48px",
-                                    height:
-                                      "48px",
-                                    borderRadius:
-                                      "50%",
-                                    objectFit:
-                                      "cover",
-                                    flexShrink:
-                                      0,
-                                  }}
-                                />
-                              ) : (
-                                <div
-                                  style={{
-                                    width:
-                                      "48px",
-                                    height:
-                                      "48px",
-                                    borderRadius:
-                                      "50%",
-                                    display:
-                                      "flex",
-                                    alignItems:
-                                      "center",
-                                    justifyContent:
-                                      "center",
-                                    background:
-                                      "#f1f1f1",
-                                    flexShrink:
-                                      0,
-                                  }}
-                                >
-                                  ♙
-                                </div>
-                              )}
+                            <td>
 
                               <div
+                                className="admin-consultant-name"
                                 style={{
                                   display:
                                     "flex",
-                                  flexDirection:
-                                    "column",
+                                  alignItems:
+                                    "center",
+                                  gap:
+                                    "12px",
                                 }}
                               >
 
-                                <strong>
-                                  {
-                                    consultant.name
-                                  }
-                                </strong>
+                                {consultant.photo ? (
+                                  <img
+                                    src={
+                                      consultant.photo
+                                    }
+                                    alt={
+                                      consultant.name
+                                    }
+                                    style={{
+                                      width:
+                                        "48px",
+                                      height:
+                                        "48px",
+                                      borderRadius:
+                                        "50%",
+                                      objectFit:
+                                        "cover",
+                                      flexShrink:
+                                        0,
+                                    }}
+                                  />
+                                ) : (
+                                  <div
+                                    style={{
+                                      width:
+                                        "48px",
+                                      height:
+                                        "48px",
+                                      borderRadius:
+                                        "50%",
+                                      display:
+                                        "flex",
+                                      alignItems:
+                                        "center",
+                                      justifyContent:
+                                        "center",
+                                      background:
+                                        "#f1f1f1",
+                                      flexShrink:
+                                        0,
+                                    }}
+                                  >
+                                    ♙
+                                  </div>
+                                )}
+
+                                <div
+                                  style={{
+                                    display:
+                                      "flex",
+                                    flexDirection:
+                                      "column",
+                                  }}
+                                >
+
+                                  <strong>
+                                    {
+                                      consultant.name
+                                    }
+                                  </strong>
+
+                                  <span>
+                                    {
+                                      consultant.email
+                                    }
+                                  </span>
+
+                                </div>
+
+                              </div>
+
+                            </td>
+
+
+                            <td>
+                              {
+                                consultant.specialization
+                              }
+                            </td>
+
+
+                            <td>
+
+                              <div className="admin-consultant-contact">
 
                                 <span>
                                   {
+                                    consultant.phone
+                                  }
+                                </span>
+
+                                <small>
+                                  {
                                     consultant.email
                                   }
+                                </small>
+
+                              </div>
+
+                            </td>
+
+
+                            <td>
+
+                              <div className="admin-consultant-modes">
+
+                                {consultant.availableModes.includes(
+                                  "video"
+                                ) && (
+                                  <span>
+                                    Video
+                                  </span>
+                                )}
+
+                                {consultant.availableModes.includes(
+                                  "voice"
+                                ) && (
+                                  <span>
+                                    Voice
+                                  </span>
+                                )}
+
+                              </div>
+
+                            </td>
+
+
+                            <td>
+
+                              <div className="admin-consultant-availability-summary">
+
+                                <strong>
+                                  {countFutureAvailabilityDates(
+                                    consultant
+                                  )}
+                                </strong>
+
+                                <span>
+                                  date
+                                  {countFutureAvailabilityDates(
+                                    consultant
+                                  ) !== 1
+                                    ? "s"
+                                    : ""}
                                 </span>
 
                               </div>
 
-                            </div>
-
-                          </td>
+                            </td>
 
 
-                          <td>
-                            {
-                              consultant.specialization
-                            }
-                          </td>
+                            <td>
 
+                              <span
+                                className={`admin-consultant-status ${
+                                  consultant.active
+                                    ? "admin-consultant-status-active"
+                                    : "admin-consultant-status-inactive"
+                                }`}
+                              >
 
-                          <td>
+                                <i />
 
-                            <div className="admin-consultant-contact">
-
-                              <span>
                                 {
-                                  consultant.phone
+                                  consultant.active
+                                    ? "Active"
+                                    : "Inactive"
                                 }
+
                               </span>
 
-                              <small>
-                                {
-                                  consultant.email
-                                }
-                              </small>
-
-                            </div>
-
-                          </td>
+                            </td>
 
 
-                          <td>
+                            <td>
 
-                            <div className="admin-consultant-modes">
+                              <div className="admin-consultant-actions">
 
-                              {consultant.availableModes.includes(
-                                "video"
-                              ) && (
-                                <span>
-                                  Video
-                                </span>
-                              )}
+                                <button
+                                  type="button"
+                                  className="admin-consultant-edit"
+                                  onClick={() =>
+                                    openEditForm(
+                                      consultant
+                                    )
+                                  }
+                                  disabled={
+                                    saving
+                                  }
+                                >
+                                  Edit
+                                </button>
 
-                              {consultant.availableModes.includes(
-                                "voice"
-                              ) && (
-                                <span>
-                                  Voice
-                                </span>
-                              )}
+                                {consultant.active &&
+                                  !isProtectedConsultant && (
+                                    <button
+                                      type="button"
+                                      className="admin-consultant-remove"
+                                      onClick={() =>
+                                        removeConsultant(
+                                          consultant
+                                        )
+                                      }
+                                      disabled={
+                                        saving
+                                      }
+                                    >
+                                      Remove Profile
+                                    </button>
+                                  )}
 
-                            </div>
+                              </div>
 
-                          </td>
+                            </td>
 
-
-                          <td>
-
-                            <div className="admin-consultant-availability-summary">
-
-                              <strong>
-                                {
-                                  consultant
-                                    .availability
-                                    ?.length ||
-                                  0
-                                }
-                              </strong>
-
-                              <span>
-                                date
-                                {
-                                  (
-                                    consultant
-                                      .availability
-                                      ?.length ||
-                                    0
-                                  ) !==
-                                  1
-                                    ? "s"
-                                    : ""
-                                }
-                              </span>
-
-                            </div>
-
-                          </td>
-
-
-                          <td>
-
-                            <span
-                              className={`admin-consultant-status ${
-                                consultant.active
-                                  ? "admin-consultant-status-active"
-                                  : "admin-consultant-status-inactive"
-                              }`}
-                            >
-
-                              <i />
-
-                              {
-                                consultant.active
-                                  ? "Active"
-                                  : "Inactive"
-                              }
-
-                            </span>
-
-                          </td>
-
-
-                          <td>
-
-                            <button
-                              type="button"
-                              className="admin-consultant-edit"
-                              onClick={() =>
-                                openEditForm(
-                                  consultant
-                                )
-                              }
-                            >
-                              Edit
-                            </button>
-
-                          </td>
-
-                        </tr>
-
-                      )
+                          </tr>
+                        );
+                      }
                     )}
 
                   </tbody>

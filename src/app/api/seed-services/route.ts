@@ -7,6 +7,21 @@ import Service from "@/models/Service";
 import { services } from "@/data/services";
 
 export async function GET() {
+  /*
+   * ============================================
+   * PRODUCTION SAFETY
+   * ============================================
+   *
+   * This endpoint is a development/maintenance
+   * helper that writes service data to MongoDB.
+   * It must never be publicly usable in production.
+   */
+  if (process.env.NODE_ENV === "production") {
+    return new NextResponse(null, {
+      status: 404,
+    });
+  }
+
   try {
     /*
      * ============================================

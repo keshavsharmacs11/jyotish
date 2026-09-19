@@ -1,36 +1,34 @@
 "use client";
 
 import { useState } from "react";
-
-const faqData = [
-  {
-    question: "How do I book a consultation?",
-    answer:
-      "Click on the Book Consultation button, select your preferred service, choose an available date and time, and confirm your booking.",
-  },
-  {
-    question: "Are online consultations available?",
-    answer:
-      "Yes. All consultations are available online through Google Meet or your preferred communication platform.",
-  },
-  {
-    question: "Which services do you provide?",
-    answer:
-      "We provide Vedic Astrology, Numerology, Tarot Reading, Career Guidance, Marriage Consultation and Business Consultation.",
-  },
-  {
-    question: "How long is one consultation?",
-    answer:
-      "Most consultations last between 30 and 60 minutes depending on the selected service.",
-  },
-  {
-    question: "Can I reschedule my booking?",
-    answer:
-      "Yes. You can request a reschedule before your appointment time by contacting our support.",
-  },
-];
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function FAQ() {
+  const { t } = useLanguage();
+
+  const faqData = [
+    {
+      question: t("home.faq.q1"),
+      answer: t("home.faq.a1"),
+    },
+    {
+      question: t("home.faq.q2"),
+      answer: t("home.faq.a2"),
+    },
+    {
+      question: t("home.faq.q3"),
+      answer: t("home.faq.a3"),
+    },
+    {
+      question: t("home.faq.q4"),
+      answer: t("home.faq.a4"),
+    },
+    {
+      question: t("home.faq.q5"),
+      answer: t("home.faq.a5"),
+    },
+  ];
+
   const [activeIndex, setActiveIndex] = useState<number | null>(0);
 
   const toggle = (index: number) => {
@@ -40,39 +38,42 @@ export default function FAQ() {
   return (
     <section className="section">
       <div className="site-container">
-
-        <p className="eyebrow">FAQ</p>
+        <p className="eyebrow">{t("home.faq.eyebrow")}</p>
 
         <h2 className="section-heading">
-          Frequently Asked Questions
+          {t("home.faq.title")}
         </h2>
 
         <div className="faq-container">
           {faqData.map((faq, index) => (
             <div key={faq.question} className="faq-card">
-
               <button
+                id={`faq-question-${index}`}
                 className="faq-question"
                 onClick={() => toggle(index)}
+                aria-expanded={activeIndex === index}
+                aria-controls={`faq-answer-${index}`}
               >
                 <span>{faq.question}</span>
 
                 <span className="faq-icon">
                   {activeIndex === index ? "−" : "+"}
                 </span>
-
               </button>
 
               {activeIndex === index && (
-                <div className="faq-answer">
+                <div
+                  id={`faq-answer-${index}`}
+                  className="faq-answer"
+                  role="region"
+                  aria-labelledby={`faq-question-${index}`}
+                >
                   <p>{faq.answer}</p>
                 </div>
               )}
-
             </div>
           ))}
         </div>
-
       </div>
     </section>
   );

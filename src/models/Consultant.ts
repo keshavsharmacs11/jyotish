@@ -28,7 +28,20 @@ export interface IConsultant
     times: string[];
   }[];
 
+  availabilityWindows: {
+    date: string;
+    startTime: string;
+    endTime: string;
+  }[];
+
   active: boolean;
+
+  /**
+   * When present, this profile belongs to the administrator
+   * who created it for their own consultations. Consultant-only
+   * invited profiles keep this field null.
+   */
+  administratorId?: mongoose.Types.ObjectId | null;
 
   createdAt: Date;
   updatedAt: Date;
@@ -129,18 +142,61 @@ const ConsultantSchema =
 
       /*
        * =========================================
+       * AVAILABILITY WINDOWS
+       * =========================================
+       *
+       * Calendar-managed availability windows.
+       * The legacy availability field is retained
+       * for backward compatibility.
+       */
+
+      availabilityWindows: [
+        {
+          date: {
+            type: String,
+            required: true,
+          },
+
+          startTime: {
+            type: String,
+            required: true,
+          },
+
+          endTime: {
+            type: String,
+            required: true,
+          },
+        },
+      ],
+
+      /*
+       * =========================================
        * ACTIVE / INACTIVE
        * =========================================
        *
-       * We don't permanently delete consultants
-       * because historical bookings may refer
-       * to them.
+       * Normal removal is a soft revoke so historical
+       * bookings remain intact. Permanent deletion is
+       * handled by the protected admin API only when
+       * no historical booking references the consultant.
        */
 
       active: {
         type: Boolean,
         default: true,
         index: true,
+      },
+
+      /**
+       * One-to-one link to an administrator account when this
+       * is that administrator's own consultant profile.
+       * Sparse uniqueness allows consultant-only profiles to
+       * leave the field empty/null.
+       */
+      administratorId: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+        unique: true,
+        sparse: true,
       },
     },
 

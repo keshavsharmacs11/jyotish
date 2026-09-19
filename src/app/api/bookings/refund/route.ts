@@ -11,42 +11,141 @@ import Payment from "@/models/Payment";
 
 /*
  * =========================================================
- * POST REFUND
+ * SERIALIZE BOOKING
  * =========================================================
  *
- * Admin-only full refund endpoint.
+ * Refund information is stored in Payment.
  *
- * POST /api/bookings/refund
+ * The frontend needs the refund information every time it
+ * loads/reloads a booking.
+ */
+
+function serializeBooking(
+  booking: any,
+  payment?: any
+) {
+  return {
+    _id: booking._id
+      ? booking._id.toString()
+      : undefined,
+
+    bookingId:
+      booking.bookingId,
+
+    userId:
+      booking.userId
+        ? booking.userId.toString()
+        : null,
+
+    serviceId:
+      booking.serviceId,
+
+    serviceName:
+      booking.serviceName,
+
+    category:
+      booking.category,
+
+    mode:
+      booking.mode,
+
+    date:
+      booking.date,
+
+    time:
+      booking.time,
+
+    consultantId:
+      booking.consultantId
+        ? booking.consultantId.toString()
+        : null,
+
+    consultantName:
+      booking.consultantName || "",
+
+    customer:
+      booking.customer || {},
+
+    price:
+      booking.price,
+
+    currency:
+      booking.currency,
+
+    status:
+      booking.status,
+
+    paymentStatus:
+      booking.paymentStatus,
+
+    refundReason:
+      booking.refundReason || "",
+
+    razorpayOrderId:
+      booking.razorpayOrderId || "",
+
+    razorpayPaymentId:
+      booking.razorpayPaymentId || "",
+
+    /*
+     * Payment refund information
+     */
+
+    refundStatus:
+      payment?.refundStatus || null,
+
+    razorpayRefundId:
+      payment?.razorpayRefundId || null,
+
+    refundReasonFromPayment:
+      payment?.refundReason || "",
+
+    paymentStatusFromPayment:
+      payment?.status || null,
+
+    createdAt:
+      booking.createdAt,
+
+    updatedAt:
+      booking.updatedAt,
+  };
+}
+
+/*
+ * =========================================================
+ * POST /api/admin/bookings/refund
+ * =========================================================
  *
- * Body:
+ * ADMIN ONLY
  *
- * {
- *   bookingId: "AKJ-2026-123456",
- *   reason: "Customer requested cancellation"
- * }
+ * Refund lifecycle:
+ *
+ * null
+ *   ↓
+ * pending
+ *   ↓
+ * ┌───────────────┐
+ * ↓               ↓
+ * processed       failed
+ * ↓               ↓
+ * refunded        retry allowed
  *
  * IMPORTANT:
  *
- * This endpoint creates the refund in Razorpay.
+ * We do NOT mark the booking as cancelled while the refund
+ * is still pending.
  *
- * It does NOT assume that the refund is finally
- * processed immediately.
- *
- * Final refund state is confirmed through:
- *
- * refund.processed
- * refund.failed
- *
- * Razorpay webhook events.
+ * The booking is cancelled only after the refund is
+ * actually processed.
  */
 
 export async function POST(
   request: NextRequest
 ) {
   /*
-   * ==========================================
+   * =======================================================
    * ADMIN AUTHENTICATION
-   * ==========================================
+   * =======================================================
    */
 
   const auth =
@@ -58,9 +157,9 @@ export async function POST(
 
   try {
     /*
-     * ==========================================
-     * REQUEST BODY
-     * ==========================================
+     * =====================================================
+     * READ REQUEST
+     * =====================================================
      */
 
     const body =
@@ -74,13 +173,14 @@ export async function POST(
     const reason =
       String(
         body.reason ||
-          "Booking cancelled"
+          body.refundReason ||
+          "Booking cancelled by administrator."
       ).trim();
 
     /*
-     * ==========================================
-     * VALIDATION
-     * ==========================================
+     * =====================================================
+     * VALIDATE BOOKING ID
+     * =====================================================
      */
 
     if (!bookingId) {
@@ -97,9 +197,9 @@ export async function POST(
     }
 
     /*
-     * ==========================================
+     * =====================================================
      * RAZORPAY CONFIGURATION
-     * ==========================================
+     * =====================================================
      */
 
     const keyId =
@@ -113,12 +213,13 @@ export async function POST(
       !keySecret
     ) {
       console.error(
-        "RAZORPAY REFUND CONFIGURATION ERROR."
+        "RAZORPAY REFUND CONFIGURATION ERROR: Missing Razorpay credentials."
       );
 
       return NextResponse.json(
         {
           success: false,
+
           error:
             "Refund service is not configured.",
         },
@@ -129,17 +230,17 @@ export async function POST(
     }
 
     /*
-     * ==========================================
+     * =====================================================
      * DATABASE
-     * ==========================================
+     * =====================================================
      */
 
     await connectMongoose();
 
     /*
-     * ==========================================
+     * =====================================================
      * FIND BOOKING
-     * ==========================================
+     * =====================================================
      */
 
     const booking =
@@ -151,6 +252,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
+
           error:
             "Booking could not be found.",
         },
@@ -161,9 +263,12 @@ export async function POST(
     }
 
     /*
-     * ==========================================
+     * =====================================================
      * COMPLETED BOOKING
-     * ==========================================
+     * =====================================================
+     *
+     * Do not refund a completed consultation through
+     * this cancellation flow.
      */
 
     if (
@@ -173,6 +278,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
+
           error:
             "A completed consultation cannot be refunded through this cancellation flow.",
         },
@@ -183,31 +289,9 @@ export async function POST(
     }
 
     /*
-     * ==========================================
-     * PAYMENT MUST BE PAID
-     * ==========================================
-     */
-
-    if (
-      booking.paymentStatus !==
-      "paid"
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Only paid bookings can be refunded.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    /*
-     * ==========================================
+     * =====================================================
      * FIND PAYMENT
-     * ==========================================
+     * =====================================================
      */
 
     const payment =
@@ -220,6 +304,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
+
           error:
             "Payment record could not be found.",
         },
@@ -230,9 +315,153 @@ export async function POST(
     }
 
     /*
-     * ==========================================
+     * =====================================================
+     * ALREADY REFUNDED
+     * =====================================================
+     */
+
+    if (
+      payment.status ===
+        "refunded" ||
+      payment.refundStatus ===
+        "processed"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          refunded: true,
+
+          refundPending: false,
+
+          refundFailed: false,
+
+          error:
+            "This payment has already been refunded.",
+
+          refund: {
+            refundId:
+              payment.razorpayRefundId ||
+              null,
+
+            amount:
+              payment.amount,
+
+            currency:
+              payment.currency,
+
+            status:
+              payment.refundStatus,
+
+            reason:
+              payment.refundReason ||
+              "",
+          },
+
+          booking:
+            serializeBooking(
+              booking,
+              payment
+            ),
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    /*
+     * =====================================================
+     * REFUND ALREADY PENDING
+     * =====================================================
+     *
+     * THIS IS THE MOST IMPORTANT PROTECTION.
+     *
+     * If a refund has already been created and is pending,
+     * NEVER create another refund.
+     *
+     * This also means that if the admin closes the booking
+     * and opens it again, another refund cannot be created.
+     */
+
+    if (
+      payment.refundStatus ===
+      "pending"
+    ) {
+      return NextResponse.json(
+        {
+          success: true,
+
+          refunded: false,
+
+          refundPending: true,
+
+          refundFailed: false,
+
+          message:
+            "A refund is already being processed. Please wait for Razorpay confirmation.",
+
+          refund: {
+            refundId:
+              payment.razorpayRefundId ||
+              null,
+
+            amount:
+              payment.amount,
+
+            currency:
+              payment.currency,
+
+            status:
+              payment.refundStatus,
+
+            reason:
+              payment.refundReason ||
+              "",
+          },
+
+          booking:
+            serializeBooking(
+              booking,
+              payment
+            ),
+        },
+        {
+          status: 200,
+        }
+      );
+    }
+
+    /*
+     * =====================================================
+     * BOOKING MUST BE PAID
+     * =====================================================
+     *
+     * If a refund previously failed, the booking remains
+     * paid and can be retried.
+     */
+
+    if (
+      booking.paymentStatus !==
+      "paid"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          error:
+            "Only paid bookings can be refunded.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    /*
+     * =====================================================
      * PAYMENT MUST BE PAID
-     * ==========================================
+     * =====================================================
      */
 
     if (
@@ -242,6 +471,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
+
           error:
             "The payment is not eligible for refund.",
         },
@@ -252,17 +482,20 @@ export async function POST(
     }
 
     /*
-     * ==========================================
+     * =====================================================
      * RAZORPAY PAYMENT ID
-     * ==========================================
+     * =====================================================
      */
 
-    if (
-      !payment.razorpayPaymentId
-    ) {
+    const razorpayPaymentId =
+      payment.razorpayPaymentId ||
+      booking.razorpayPaymentId;
+
+    if (!razorpayPaymentId) {
       return NextResponse.json(
         {
           success: false,
+
           error:
             "Razorpay payment ID is missing.",
         },
@@ -273,111 +506,178 @@ export async function POST(
     }
 
     /*
-     * ==========================================
-     * REFUND ALREADY PROCESSED
-     * ==========================================
+     * =====================================================
+     * REFUND AMOUNT
+     * =====================================================
+     *
+     * Razorpay expects the smallest currency unit.
+     *
+     * ₹5,000 = 500000 paise
      */
 
+    const refundAmount =
+      Math.round(
+        Number(
+          payment.amount
+        ) * 100
+      );
+
     if (
-      payment.status ===
-        "refunded" ||
-      payment.refundStatus ===
-        "processed" ||
-      payment.razorpayRefundId
+      !Number.isFinite(
+        refundAmount
+      ) ||
+      refundAmount <= 0
     ) {
       return NextResponse.json(
         {
           success: false,
+
           error:
-            "This payment has already been refunded.",
+            "Refund amount must be greater than zero.",
         },
         {
-          status: 409,
+          status: 400,
         }
       );
     }
 
     /*
-     * ==========================================
-     * MARK REFUND REQUEST AS PENDING
-     * ==========================================
+     * =====================================================
+     * NEW REFUND ATTEMPT
+     * =====================================================
      *
-     * We intentionally keep:
+     * We only reach this point when:
      *
-     * payment.status = "paid"
+     * - there is no refund yet
+     * OR
+     * - the previous refund failed.
      *
-     * until Razorpay confirms the refund.
+     * A failed refund can be retried.
+     */
+
+    const isRetry =
+      payment.refundStatus ===
+      "failed";
+
+    /*
+     * Clear the old refund ID only when retrying a failed
+     * refund.
+     */
+
+    if (isRetry) {
+      payment.razorpayRefundId =
+        undefined;
+    }
+
+    /*
+     * Mark the new attempt as pending BEFORE calling
+     * Razorpay.
      *
-     * This prevents our database from claiming
-     * that money has been refunded before the
-     * payment processor confirms it.
+     * This protects against another admin request arriving
+     * while this request is being processed.
      */
 
     payment.refundStatus =
       "pending";
 
     payment.refundReason =
-      reason;
+      reason.slice(
+        0,
+        255
+      );
 
     await payment.save();
 
     /*
-     * ==========================================
-     * RAZORPAY REFUND
-     * ==========================================
+     * =====================================================
+     * UNIQUE REFUND ATTEMPT ID
+     * =====================================================
      *
-     * Full refund.
+     * Each genuinely new refund attempt receives a unique
+     * idempotency key.
      *
-     * Razorpay amount is in the smallest
-     * currency unit.
+     * This is appropriate for:
      *
-     * Example:
-     *
-     * ₹3000 -> 300000 paise
+     * first attempt
+     * OR
+     * retry after confirmed failure
      */
 
-    const refundAmount =
-      Math.round(
-        payment.amount * 100
+    const attemptId =
+      `${booking.bookingId}_${Date.now()}`;
+
+    const idempotencyKey =
+      `refund_${attemptId}`;
+
+    /*
+     * Razorpay idempotency keys support alphanumeric,
+     * underscore and hyphen characters.
+     */
+
+    const receipt =
+      `refund_${attemptId}`;
+
+    /*
+     * =====================================================
+     * AUTHORIZATION
+     * =====================================================
+     */
+
+    const authorization =
+      Buffer.from(
+        `${keyId}:${keySecret}`
+      ).toString(
+        "base64"
       );
 
     /*
-     * ==========================================
-     * IDEMPOTENCY KEY
-     * ==========================================
-     *
-     * Same booking + payment always produces
-     * the same key.
-     *
-     * Therefore a safe retry will not create
-     * another refund.
+     * =====================================================
+     * RAZORPAY REFUND URL
+     * =====================================================
      */
 
-    const idempotencyKey =
-      `refund_${booking.bookingId}_${payment.razorpayPaymentId}`;
+    const razorpayUrl =
+      `https://api.razorpay.com/v1/payments/${encodeURIComponent(
+        razorpayPaymentId
+      )}/refund`;
 
-    const receipt =
-      `refund_${booking.bookingId}`;
+    console.log(
+      "CREATING RAZORPAY REFUND:",
+      {
+        bookingId:
+          booking.bookingId,
+
+        paymentId:
+          razorpayPaymentId,
+
+        amount:
+          refundAmount,
+
+        idempotencyKey,
+
+        receipt,
+
+        retry:
+          isRetry,
+      }
+    );
 
     /*
-     * ==========================================
+     * =====================================================
      * CALL RAZORPAY
-     * ==========================================
+     * =====================================================
      */
 
     const razorpayResponse =
       await fetch(
-        `https://api.razorpay.com/v1/payments/${encodeURIComponent(
-          payment.razorpayPaymentId
-        )}/refund`,
+        razorpayUrl,
         {
-          method: "POST",
+          method:
+            "POST",
 
           headers: {
             Authorization:
-              `Basic ${Buffer.from(
-                `${keyId}:${keySecret}`
-              ).toString("base64")}`,
+              `Basic ${authorization}`,
 
             "Content-Type":
               "application/json",
@@ -388,8 +688,21 @@ export async function POST(
 
           body:
             JSON.stringify({
+              /*
+               * Full refund.
+               */
+
               amount:
                 refundAmount,
+
+              /*
+               * Razorpay Instant Refund mode.
+               *
+               * Razorpay's current API uses `optimum` for Instant
+               * Refunds: it attempts instant fund transfer when
+               * eligible and automatically falls back to normal
+               * processing when instant refund is unavailable.
+               */
 
               speed:
                 "optimum",
@@ -411,18 +724,86 @@ export async function POST(
       );
 
     /*
-     * ==========================================
-     * READ RAZORPAY RESPONSE
-     * ==========================================
+     * =====================================================
+     * READ RESPONSE SAFELY
+     * =====================================================
      */
 
-    const razorpayData =
-      await razorpayResponse.json();
+    const responseText =
+      await razorpayResponse.text();
+
+    let razorpayData:
+      any = {};
+
+    if (
+      responseText
+    ) {
+      try {
+        razorpayData =
+          JSON.parse(
+            responseText
+          );
+      } catch {
+        console.error(
+          "RAZORPAY RETURNED NON-JSON RESPONSE:",
+          {
+            status:
+              razorpayResponse.status,
+
+            response:
+              responseText.slice(
+                0,
+                1000
+              ),
+          }
+        );
+
+        /*
+         * We cannot safely say the refund definitely failed.
+         *
+         * However, because this request did not give us a
+         * refund ID, leave it pending rather than exposing
+         * another refund button immediately.
+         *
+         * The admin should verify the Razorpay dashboard/
+         * webhook before retrying.
+         */
+
+        payment.refundStatus =
+          "pending";
+
+        await payment.save();
+
+        return NextResponse.json(
+          {
+            success: false,
+
+            refunded: false,
+
+            refundPending: true,
+
+            refundFailed: false,
+
+            error:
+              `Razorpay returned an unexpected response (HTTP ${razorpayResponse.status}). The refund state has been kept pending to prevent a duplicate refund.`,
+          },
+          {
+            status: 502,
+          }
+        );
+      }
+    }
 
     /*
-     * ==========================================
-     * RAZORPAY ERROR
-     * ==========================================
+     * =====================================================
+     * RAZORPAY REQUEST FAILED
+     * =====================================================
+     *
+     * This means Razorpay explicitly rejected the refund
+     * request.
+     *
+     * Therefore this attempt is genuinely failed and the
+     * admin may retry.
      */
 
     if (
@@ -430,17 +811,36 @@ export async function POST(
     ) {
       console.error(
         "RAZORPAY REFUND FAILED:",
-        razorpayData
+        {
+          status:
+            razorpayResponse.status,
+
+          data:
+            razorpayData,
+        }
       );
 
       payment.refundStatus =
         "failed";
+
+      /*
+       * There is no successful refund ID for this attempt.
+       */
+
+      payment.razorpayRefundId =
+        undefined;
 
       await payment.save();
 
       return NextResponse.json(
         {
           success: false,
+
+          refunded: false,
+
+          refundPending: false,
+
+          refundFailed: true,
 
           error:
             razorpayData?.error
@@ -448,32 +848,51 @@ export async function POST(
             razorpayData?.error
               ?.reason ||
             "Razorpay refund failed.",
+
+          booking:
+            serializeBooking(
+              booking,
+              payment
+            ),
         },
         {
-          status: 400,
+          status:
+            razorpayResponse.status >=
+              400 &&
+            razorpayResponse.status <
+              500
+              ? razorpayResponse.status
+              : 502,
         }
       );
     }
 
     /*
-     * ==========================================
-     * REFUND ID
-     * ==========================================
+     * =====================================================
+     * EXTRACT REFUND ID
+     * =====================================================
      */
 
-    const razorpayRefundId =
+    const refundId =
       razorpayData?.id;
 
-    if (
-      !razorpayRefundId
-    ) {
+    if (!refundId) {
       console.error(
-        "Razorpay refund response did not contain refund ID:",
+        "RAZORPAY REFUND RESPONSE DID NOT CONTAIN REFUND ID:",
         razorpayData
       );
 
+      /*
+       * We do NOT mark this as failed automatically.
+       *
+       * Razorpay may have accepted the refund even if our
+       * response was incomplete.
+       *
+       * Keeping it pending prevents a duplicate refund.
+       */
+
       payment.refundStatus =
-        "failed";
+        "pending";
 
       await payment.save();
 
@@ -481,75 +900,197 @@ export async function POST(
         {
           success: false,
 
+          refunded: false,
+
+          refundPending: true,
+
+          refundFailed: false,
+
           error:
-            "Refund was created but Razorpay did not return a refund ID.",
+            "Razorpay accepted an unexpected response without a refund ID. The refund has been kept pending to prevent a duplicate refund.",
+
+          booking:
+            serializeBooking(
+              booking,
+              payment
+            ),
         },
         {
-          status: 500,
+          status: 502,
         }
       );
     }
 
     /*
-     * ==========================================
-     * IMPORTANT
-     * ==========================================
-     *
-     * DO NOT mark payment as "refunded" yet.
-     *
-     * Razorpay can return a refund that is still
-     * pending.
-     *
-     * The refund webhook will provide the final
-     * state.
+     * =====================================================
+     * READ RAZORPAY REFUND STATUS
+     * =====================================================
      */
 
-    payment.refundStatus =
+    const razorpayRefundStatus =
+      razorpayData?.status ||
       "pending";
 
+    /*
+     * =====================================================
+     * SAVE REFUND ID
+     * =====================================================
+     */
+
     payment.razorpayRefundId =
-      razorpayRefundId;
+      refundId;
 
     payment.refundReason =
-      reason;
+      reason.slice(
+        0,
+        255
+      );
+
+    /*
+     * =====================================================
+     * HANDLE REFUND STATUS
+     * =====================================================
+     */
+
+    if (
+      razorpayRefundStatus ===
+      "processed"
+    ) {
+      /*
+       * FINAL SUCCESS
+       */
+
+      payment.refundStatus =
+        "processed";
+
+      payment.status =
+        "refunded";
+    } else if (
+      razorpayRefundStatus ===
+      "failed"
+    ) {
+      /*
+       * FINAL FAILURE
+       *
+       * Keep the original payment as paid.
+       * This allows another refund attempt.
+       */
+
+      payment.refundStatus =
+        "failed";
+
+      payment.status =
+        "paid";
+    } else {
+      /*
+       * PENDING
+       */
+
+      payment.refundStatus =
+        "pending";
+
+      payment.status =
+        "paid";
+    }
 
     await payment.save();
 
     /*
-     * ==========================================
-     * SUCCESS
-     * ==========================================
+     * =====================================================
+     * UPDATE BOOKING ONLY WHEN REFUND PROCESSED
+     * =====================================================
+     *
+     * IMPORTANT:
+     *
+     * Pending refund:
+     *   booking remains paid
+     *   booking remains in current status
+     *   refund button must disappear
+     *
+     * Processed refund:
+     *   booking becomes cancelled
+     *   payment becomes refunded
+     */
+
+    if (
+      razorpayRefundStatus ===
+      "processed"
+    ) {
+      booking.paymentStatus =
+        "refunded";
+
+      booking.status =
+        "cancelled";
+
+      booking.refundReason =
+        reason.slice(
+          0,
+          255
+        );
+
+      await booking.save();
+    }
+
+    /*
+     * =====================================================
+     * LOG
+     * =====================================================
      */
 
     console.log(
-      "REFUND CREATED:",
+      "RAZORPAY REFUND RESULT:",
       {
         bookingId:
           booking.bookingId,
 
         paymentId:
-          payment.razorpayPaymentId,
+          razorpayPaymentId,
 
-        refundId:
-          razorpayRefundId,
+        refundId,
 
         amount:
           payment.amount,
 
         refundStatus:
           payment.refundStatus,
+
+        razorpayStatus:
+          razorpayRefundStatus,
       }
     );
+
+    /*
+     * =====================================================
+     * RESPONSE
+     * =====================================================
+     */
 
     return NextResponse.json({
       success: true,
 
+      refunded:
+        razorpayRefundStatus ===
+        "processed",
+
+      refundPending:
+        razorpayRefundStatus ===
+        "pending",
+
+      refundFailed:
+        razorpayRefundStatus ===
+        "failed",
+
       message:
-        "Refund request created successfully. Waiting for Razorpay confirmation.",
+        razorpayRefundStatus ===
+        "processed"
+          ? "Booking cancelled and refund processed successfully."
+          : razorpayRefundStatus ===
+            "failed"
+          ? "Refund failed. You can retry the refund."
+          : "Refund request submitted successfully. Waiting for Razorpay confirmation.",
 
       refund: {
-        refundId:
-          razorpayRefundId,
+        refundId,
 
         amount:
           payment.amount,
@@ -561,25 +1102,26 @@ export async function POST(
           payment.refundStatus,
 
         razorpayStatus:
-          razorpayData?.status ||
-          "pending",
+          razorpayRefundStatus,
 
         reason:
-          payment.refundReason,
+          payment.refundReason ||
+          "",
       },
 
-      booking: {
-        bookingId:
-          booking.bookingId,
-
-        status:
-          booking.status,
-
-        paymentStatus:
-          booking.paymentStatus,
-      },
+      booking:
+        serializeBooking(
+          booking,
+          payment
+        ),
     });
   } catch (error) {
+    /*
+     * =====================================================
+     * UNEXPECTED ERROR
+     * =====================================================
+     */
+
     console.error(
       "ADMIN REFUND ERROR:",
       error
@@ -588,6 +1130,10 @@ export async function POST(
     return NextResponse.json(
       {
         success: false,
+
+        refunded: false,
+
+        refundPending: false,
 
         error:
           error instanceof Error
