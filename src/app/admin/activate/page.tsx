@@ -2,12 +2,13 @@
 
 import {
   FormEvent,
+  Suspense,
   useState,
 } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-export default function AdminActivatePage() {
+function AdminActivateContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") || "";
 
@@ -244,5 +245,27 @@ export default function AdminActivatePage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function AdminActivatePage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="admin-login-page">
+          <div className="admin-login-shell">
+            <div className="admin-login-card">
+              <div className="admin-login-card-header">
+                <div className="admin-login-eyebrow">ADMINISTRATION</div>
+                <h1>Loading...</h1>
+                <p>Preparing administrator activation.</p>
+              </div>
+            </div>
+          </div>
+        </main>
+      }
+    >
+      <AdminActivateContent />
+    </Suspense>
   );
 }

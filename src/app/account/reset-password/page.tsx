@@ -2,6 +2,7 @@
 
 import {
   FormEvent,
+  Suspense,
   useEffect,
   useRef,
   useState,
@@ -22,7 +23,7 @@ import {
   NEW_PASSWORD_MAX_LENGTH,
 } from "@/lib/validation";
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const searchParams =
     useSearchParams();
 
@@ -774,5 +775,23 @@ export default function ResetPasswordPage() {
         </div>
       </section>
     </>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <section className="section">
+          <div className="site-container">
+            <div className="booking-summary-card">
+              Loading password reset...
+            </div>
+          </div>
+        </section>
+      }
+    >
+      <ResetPasswordContent />
+    </Suspense>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Suspense,
   useState,
 } from "react";
 
@@ -19,7 +20,7 @@ import {
   NEW_PASSWORD_MIN_LENGTH,
 } from "@/lib/validation";
 
-export default function CreateAccountPage() {
+function CreateAccountContent() {
   const { language, t } = useLanguage();
 
   const searchParams =
@@ -818,5 +819,23 @@ export default function CreateAccountPage() {
         </div>
       </section>
     </>
+  );
+}
+
+export default function CreateAccountPage() {
+  return (
+    <Suspense
+      fallback={
+        <section className="section">
+          <div className="site-container">
+            <div className="booking-summary-card">
+              Loading account creation...
+            </div>
+          </div>
+        </section>
+      }
+    >
+      <CreateAccountContent />
+    </Suspense>
   );
 }

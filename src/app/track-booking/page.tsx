@@ -2,6 +2,7 @@
 
 import {
   FormEvent,
+  Suspense,
   useEffect,
   useState,
 } from "react";
@@ -78,7 +79,7 @@ function formatStatus(
     );
 }
 
-export default function TrackBookingPage() {
+function TrackBookingPageContent() {
   const { language } = useLanguage();
   const searchParams =
     useSearchParams();
@@ -616,5 +617,23 @@ export default function TrackBookingPage() {
         </div>
       </section>
     </>
+  );
+}
+
+export default function TrackBookingPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="section">
+          <div className="site-container">
+            <div className="surface-card">
+              Loading...
+            </div>
+          </div>
+        </main>
+      }
+    >
+      <TrackBookingPageContent />
+    </Suspense>
   );
 }

@@ -2,6 +2,7 @@
 
 import {
   FormEvent,
+  Suspense,
   useEffect,
   useRef,
   useState,
@@ -10,7 +11,7 @@ import {
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-export default function AdminResetPasswordPage() {
+function AdminResetPasswordPageContent() {
   const searchParams =
     useSearchParams();
 
@@ -586,5 +587,23 @@ export default function AdminResetPasswordPage() {
       </div>
 
     </main>
+  );
+}
+
+export default function AdminResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="admin-login-page">
+          <div className="admin-login-shell">
+            <div className="admin-login-card">
+              Loading...
+            </div>
+          </div>
+        </main>
+      }
+    >
+      <AdminResetPasswordPageContent />
+    </Suspense>
   );
 }
