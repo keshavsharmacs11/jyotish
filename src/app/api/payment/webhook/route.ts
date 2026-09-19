@@ -54,6 +54,8 @@ const MAX_WEBHOOK_BODY_BYTES =
 export async function POST(
   request: NextRequest
 ) {
+  let webhookStep = "request";
+
   try {
     /*
      * =====================================================
@@ -65,6 +67,7 @@ export async function POST(
      * request headers must not be trusted as the sole size control.
      */
 
+    webhookStep = "validate content length";
     const contentLength =
       Number(
         request.headers.get(
@@ -100,6 +103,7 @@ export async function POST(
      * Do not parse and re-stringify before HMAC verification.
      */
 
+    webhookStep = "read raw body";
     const rawBody =
       await request.text();
 
@@ -132,6 +136,7 @@ export async function POST(
      * =====================================================
      */
 
+    webhookStep = "validate webhook headers";
     const signature =
       request.headers.get(
         "x-razorpay-signature"
@@ -234,6 +239,7 @@ export async function POST(
      * =====================================================
      */
 
+    webhookStep = "verify webhook signature";
     const expectedSignature =
       crypto
         .createHmac(
@@ -295,6 +301,7 @@ export async function POST(
      * =====================================================
      */
 
+    webhookStep = "parse webhook payload";
     let event: any;
 
     try {
@@ -344,6 +351,7 @@ export async function POST(
      * because its original created_at is now older.
      */
 
+    webhookStep = "connect to database";
     await connectMongoose();
 
     const existingEvent =
@@ -522,6 +530,8 @@ export async function POST(
      * PAYMENT CAPTURED / ORDER PAID
      * =====================================================
      */
+
+    webhookStep = `process ${eventName}`;
 
     if (
       eventName ===
@@ -1111,6 +1121,7 @@ export async function POST(
       eventName ===
       "refund.created"
     ) {
+      webhookStep = "refund.created";
       const refundEntity =
         event.payload
           ?.refund
@@ -1125,6 +1136,12 @@ export async function POST(
       if (!paymentId) {
         throw new Error(
           "REFUND_PAYMENT_ID_MISSING"
+        );
+      }
+
+      if (!refundId) {
+        throw new Error(
+          "REFUND_ID_MISSING"
         );
       }
 
@@ -1156,25 +1173,26 @@ export async function POST(
         });
       }
 
-      if (
-        refundId
-      ) {
-        payment.razorpayRefundId =
-          refundId;
-      }
-
-      payment.refundStatus =
-        "pending";
+      /*
+       * Keep the latest known refund ID.
+       */
+      payment.razorpayRefundId =
+        refundId;
 
       /*
-       * Original payment remains paid until
-       * Razorpay confirms the refund.
+       * Refund state must not move backwards.
+       * A delayed refund.created event must never
+       * turn an already-processed refund back to pending.
        */
-
       if (
+        payment.refundStatus !==
+          "processed" &&
         payment.status !==
-        "refunded"
+          "refunded"
       ) {
+        payment.refundStatus =
+          "pending";
+
         payment.status =
           "paid";
       }
@@ -1212,6 +1230,7 @@ export async function POST(
       eventName ===
       "refund.processed"
     ) {
+      webhookStep = "refund.processed";
       const refundEntity =
         event.payload
           ?.refund
@@ -1226,6 +1245,12 @@ export async function POST(
       if (!paymentId) {
         throw new Error(
           "PROCESSED_REFUND_PAYMENT_ID_MISSING"
+        );
+      }
+
+      if (!refundId) {
+        throw new Error(
+          "PROCESSED_REFUND_ID_MISSING"
         );
       }
 
@@ -1257,12 +1282,8 @@ export async function POST(
         });
       }
 
-      if (
-        refundId
-      ) {
-        payment.razorpayRefundId =
-          refundId;
-      }
+      payment.razorpayRefundId =
+        refundId;
 
       payment.refundStatus =
         "processed";
@@ -1320,6 +1341,7 @@ export async function POST(
       eventName ===
       "refund.failed"
     ) {
+      webhookStep = "refund.failed";
       const refundEntity =
         event.payload
           ?.refund
@@ -1334,6 +1356,12 @@ export async function POST(
       if (!paymentId) {
         throw new Error(
           "FAILED_REFUND_PAYMENT_ID_MISSING"
+        );
+      }
+
+      if (!refundId) {
+        throw new Error(
+          "FAILED_REFUND_ID_MISSING"
         );
       }
 
@@ -1365,24 +1393,26 @@ export async function POST(
         });
       }
 
-      if (
-        refundId
-      ) {
-        payment.razorpayRefundId =
-          refundId;
-      }
-
-      payment.refundStatus =
-        "failed";
+      payment.razorpayRefundId =
+        refundId;
 
       /*
-       * Original payment remains paid.
+       * A late refund.failed event must not
+       * downgrade a refund that is already known
+       * to be processed.
        */
-
       if (
+        payment.refundStatus !==
+          "processed" &&
         payment.status !==
-        "refunded"
+          "refunded"
       ) {
+        payment.refundStatus =
+          "failed";
+
+        /*
+         * Original payment remains paid.
+         */
         payment.status =
           "paid";
       }
@@ -1444,10 +1474,29 @@ export async function POST(
     /*
      * Do not log the webhook body, signature,
      * event ID, payment ID or customer data.
+     *
+     * The step and error message are safe diagnostics
+     * and make server-side failures actionable while
+     * keeping sensitive webhook data out of logs.
      */
 
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Unknown webhook processing error.";
+
+    const errorStack =
+      error instanceof Error
+        ? error.stack
+        : undefined;
+
     console.error(
-      "RAZORPAY WEBHOOK PROCESSING FAILED"
+      "RAZORPAY WEBHOOK PROCESSING FAILED:",
+      {
+        step: webhookStep,
+        message: errorMessage,
+        stack: errorStack,
+      }
     );
 
     return NextResponse.json(
@@ -1455,6 +1504,10 @@ export async function POST(
         success: false,
         error:
           "Unable to process webhook.",
+        errorCode:
+          `RAZORPAY_WEBHOOK_${webhookStep
+            .toUpperCase()
+            .replace(/[^A-Z0-9]+/g, "_")}`,
       },
       {
         status: 500,

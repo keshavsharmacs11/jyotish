@@ -16,7 +16,7 @@ const BLOCKING_STATUSES = [
   "confirmed",
   "consultant_assigned",
   "completed",
-];
+] as const;
 
 /*
  * =========================================================
@@ -223,9 +223,20 @@ function addMinutes(
  * with the parts of the current system that use it.
  */
 
+type LegacyAvailability = {
+  date: string;
+  times: string[];
+};
+
+type AvailabilityWindow = {
+  date: string;
+  startTime: string;
+  endTime: string;
+};
+
 function normalizeAvailability(
   value: unknown
-) {
+): LegacyAvailability[] {
   if (
     !Array.isArray(
       value
@@ -290,7 +301,10 @@ function normalizeAvailability(
       }
     )
     .filter(
-      Boolean
+      (
+        item
+      ): item is LegacyAvailability =>
+        item !== null
     )
     .sort(
       (
@@ -951,7 +965,7 @@ export async function PUT(
       }
     }
 
-    const requestedWindows =
+    const requestedWindows: AvailabilityWindow[] =
       rawAvailabilityWindows
         ? rawAvailabilityWindows
             .map(
@@ -1028,7 +1042,10 @@ export async function PUT(
               }
             )
             .filter(
-              Boolean
+              (
+                item: AvailabilityWindow | null
+              ): item is AvailabilityWindow =>
+                item !== null
             )
             .sort(
               (

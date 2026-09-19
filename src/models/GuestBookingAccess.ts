@@ -89,6 +89,17 @@ const GuestBookingAccessSchema =
 
 GuestBookingAccessSchema.index(
   {
+    bookingId: 1,
+    email: 1,
+  },
+  {
+    unique: true,
+    name: "unique_guest_booking_access",
+  }
+);
+
+GuestBookingAccessSchema.index(
+  {
     otpExpiresAt: 1,
   },
   {

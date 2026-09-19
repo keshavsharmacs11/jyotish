@@ -18,6 +18,16 @@ export interface IUser extends Document {
   active?: boolean;
   /** True only for admins who completed an administrator invitation. */
   consultantProfileEligible?: boolean;
+
+  /*
+   * Authentication version.
+   *
+   * Incremented when an administrator password is reset.
+   * Admin JWTs carry the current version, allowing existing
+   * JWTs to be invalidated immediately after a password change.
+   */
+  authVersion: number;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -96,6 +106,21 @@ const UserSchema =
       consultantProfileEligible: {
         type: Boolean,
         default: false,
+      },
+
+      /*
+       * Authentication version.
+       *
+       * Existing users receive version 1 through the schema
+       * default. When an administrator password is reset,
+       * this value is incremented and existing admin JWTs
+       * containing the previous version become invalid.
+       */
+      authVersion: {
+        type: Number,
+        required: true,
+        default: 1,
+        min: 1,
       },
     },
     {

@@ -42,6 +42,24 @@ export type BookingMode =
 
 /*
  * =========================================================
+ * POLICY CONSENT SNAPSHOT
+ * =========================================================
+ *
+ * Captures the exact policy acceptance attached to the
+ * booking. Kept optional on the TypeScript interface for
+ * backward compatibility with older booking documents,
+ * while the schema requires it for newly created bookings.
+ * =========================================================
+ */
+
+export interface PolicyConsentSnapshot {
+  agreed: boolean;
+  agreedAt: Date;
+  version: string;
+}
+
+/*
+ * =========================================================
  * BOOKING INTERFACE
  * =========================================================
  */
@@ -112,6 +130,12 @@ export interface IBooking
   price: number;
 
   currency: string;
+
+  /*
+   * POLICY CONSENT SNAPSHOT
+   */
+
+  policyConsent?: PolicyConsentSnapshot;
 
   /*
    * BOOKING STATUS
@@ -331,6 +355,34 @@ const BookingSchema =
 
       /*
        * =========================================
+       * POLICY CONSENT SNAPSHOT
+       * =========================================
+       *
+       * Required for every newly created booking so
+       * the accepted policy version and timestamp are
+       * persisted with the booking itself.
+       */
+
+      policyConsent: {
+        agreed: {
+          type: Boolean,
+          required: true,
+        },
+
+        agreedAt: {
+          type: Date,
+          required: true,
+        },
+
+        version: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+      },
+
+      /*
+       * =========================================
        * PRICE SNAPSHOT
        * =========================================
        */
@@ -417,12 +469,6 @@ const BookingSchema =
         index: true,
       },
     },
-
-    /*
-     * =========================================
-     * SCHEMA OPTIONS
-     * =========================================
-     */
 
     {
       timestamps: true,

@@ -22,6 +22,10 @@ import {
   getClientIp,
 } from "@/lib/requestSecurity";
 
+import {
+  getCustomerId,
+} from "@/lib/customerAuth";
+
 export async function POST(
   request: NextRequest
 ) {
@@ -69,8 +73,94 @@ export async function POST(
      * ==========================================
      */
 
-    const body =
-      await request.json();
+    const contentLength =
+      request.headers.get(
+        "content-length"
+      );
+
+    if (
+      contentLength &&
+      Number(contentLength) >
+        32 * 1024
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Payment request is too large.",
+        },
+        {
+          status: 413,
+        }
+      );
+    }
+
+    const rawBody =
+      await request.text();
+
+    if (
+      Buffer.byteLength(
+        rawBody,
+        "utf8"
+      ) >
+      32 * 1024
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Payment request is too large.",
+        },
+        {
+          status: 413,
+        }
+      );
+    }
+
+    let body: Record<
+      string,
+      unknown
+    >;
+
+    try {
+      const parsed =
+        JSON.parse(rawBody);
+
+      if (
+        !parsed ||
+        typeof parsed !==
+          "object" ||
+        Array.isArray(parsed)
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Invalid payment request.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      body =
+        parsed as Record<
+          string,
+          unknown
+        >;
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Invalid payment request.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
 
     const bookingId =
       typeof body.bookingId ===
@@ -88,6 +178,22 @@ export async function POST(
       typeof body.razorpayPaymentId ===
       "string"
         ? body.razorpayPaymentId.trim()
+        : "";
+
+    const requestEmail =
+      typeof body.customerEmail ===
+      "string"
+        ? body.customerEmail
+            .trim()
+            .toLowerCase()
+        : "";
+
+    const requestPhone =
+      typeof body.customerPhone ===
+      "string"
+        ? body.customerPhone
+            .replace(/\s+/g, "")
+            .trim()
         : "";
 
     /*
@@ -115,7 +221,9 @@ export async function POST(
     if (
       bookingId.length > 200 ||
       razorpayOrderId.length > 200 ||
-      razorpayPaymentId.length > 200
+      razorpayPaymentId.length > 200 ||
+      requestEmail.length > 320 ||
+      requestPhone.length > 50
     ) {
       return NextResponse.json(
         {
@@ -139,6 +247,15 @@ export async function POST(
 
     /*
      * ==========================================
+     * GET AUTHENTICATED CUSTOMER
+     * ==========================================
+     */
+
+    const authenticatedUserId =
+      await getCustomerId();
+
+    /*
+     * ==========================================
      * FIND BOOKING
      * ==========================================
      */
@@ -159,6 +276,100 @@ export async function POST(
           status: 404,
         }
       );
+    }
+
+    /*
+     * ==========================================
+     * BOOKING OWNERSHIP
+     * ==========================================
+     *
+     * Logged-in customer:
+     * booking.userId must match the session.
+     *
+     * Guest customer:
+     * require the same email + phone that are
+     * stored on the booking.
+     */
+
+    if (booking.userId) {
+      if (!authenticatedUserId) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "You must be logged in to update payment status.",
+          },
+          {
+            status: 401,
+          }
+        );
+      }
+
+      if (
+        booking.userId.toString() !==
+        authenticatedUserId
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "You are not authorized to update this payment.",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
+    } else {
+      const bookingEmail =
+        String(
+          booking.customer?.email ||
+            ""
+        )
+          .trim()
+          .toLowerCase();
+
+      const bookingPhone =
+        String(
+          booking.customer?.mobile ||
+            ""
+        )
+          .replace(/\s+/g, "")
+          .trim();
+
+      if (
+        !requestEmail ||
+        !requestPhone
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Customer email and mobile are required for guest payment failure reporting.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      if (
+        bookingEmail !==
+          requestEmail ||
+        bookingPhone !==
+          requestPhone
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Customer information does not match the booking.",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
     }
 
     /*
@@ -231,47 +442,6 @@ export async function POST(
 
     /*
      * ==========================================
-     * SUCCESSFUL PAYMENT IS IMMUTABLE HERE
-     * ==========================================
-     */
-
-    if (
-      payment.status === "paid" ||
-      booking.paymentStatus === "paid"
-    ) {
-      return NextResponse.json({
-        success: true,
-        message:
-          "Payment is already marked as paid.",
-      });
-    }
-
-    /*
-     * ==========================================
-     * PREVENT DOWNGRADING A STRONGER STATE
-     * ==========================================
-     */
-
-    if (
-      booking.status ===
-        "completed" ||
-      booking.status ===
-        "consultant_assigned"
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "This booking is already in a completed processing state.",
-        },
-        {
-          status: 409,
-        }
-      );
-    }
-
-    /*
-     * ==========================================
      * PAYMENT ID CONSISTENCY
      * ==========================================
      */
@@ -296,42 +466,248 @@ export async function POST(
 
     /*
      * ==========================================
-     * UPDATE PAYMENT
+     * DO NOT DOWNGRADE STRONGER PAYMENT STATE
      * ==========================================
+     *
+     * The update below is conditional at the
+     * database level so a concurrent webhook or
+     * verification request cannot be overwritten
+     * by this failure endpoint after the payment
+     * has already become paid/refunded.
      */
 
-    payment.status =
-      "failed";
-
     if (
-      razorpayPaymentId
+      payment.status ===
+        "paid" ||
+      booking.paymentStatus ===
+        "paid"
     ) {
-      payment.razorpayPaymentId =
-        razorpayPaymentId;
+      return NextResponse.json({
+        success: true,
+        message:
+          "Payment is already marked as paid.",
+      });
     }
 
-    await payment.save();
+    if (
+      payment.status ===
+        "refunded" ||
+      booking.paymentStatus ===
+        "refunded"
+    ) {
+      return NextResponse.json({
+        success: true,
+        message:
+          "Payment has already been refunded.",
+      });
+    }
+
+    if (
+      booking.status ===
+        "completed" ||
+      booking.status ===
+        "consultant_assigned" ||
+      booking.status ===
+        "cancelled"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "This booking is already in a finalized processing state.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
 
     /*
      * ==========================================
-     * UPDATE BOOKING
+     * ATOMICALLY MARK PAYMENT FAILED
      * ==========================================
      */
 
-    booking.paymentStatus =
-      "failed";
-
-    booking.status =
-      "payment_pending";
+    const paymentUpdate: Record<
+      string,
+      unknown
+    > = {
+      status: "failed",
+    };
 
     if (
       razorpayPaymentId
     ) {
-      booking.razorpayPaymentId =
+      paymentUpdate.razorpayPaymentId =
         razorpayPaymentId;
     }
 
-    await booking.save();
+    const updatedPayment =
+      await Payment.findOneAndUpdate(
+        {
+          _id: payment._id,
+
+          status: {
+            $nin: [
+              "paid",
+              "refunded",
+            ],
+          },
+        },
+        {
+          $set:
+            paymentUpdate,
+        },
+        {
+          new: true,
+        }
+      );
+
+    /*
+     * A concurrent successful webhook/
+     * verification may have won the race.
+     */
+
+    if (!updatedPayment) {
+      const latestPayment =
+        await Payment.findById(
+          payment._id
+        );
+
+      if (
+        latestPayment?.status ===
+        "paid"
+      ) {
+        return NextResponse.json({
+          success: true,
+          message:
+            "Payment was already marked as paid.",
+        });
+      }
+
+      if (
+        latestPayment?.status ===
+        "refunded"
+      ) {
+        return NextResponse.json({
+          success: true,
+          message:
+            "Payment has already been refunded.",
+        });
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Unable to safely record the payment failure.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    /*
+     * ==========================================
+     * ATOMICALLY UPDATE BOOKING
+     * ==========================================
+     */
+
+    const bookingUpdate: Record<
+      string,
+      unknown
+    > = {
+      paymentStatus:
+        "failed",
+
+      status:
+        "payment_pending",
+    };
+
+    if (
+      razorpayPaymentId
+    ) {
+      bookingUpdate.razorpayPaymentId =
+        razorpayPaymentId;
+    }
+
+    const updatedBooking =
+      await Booking.findOneAndUpdate(
+        {
+          _id: booking._id,
+
+          paymentStatus: {
+            $nin: [
+              "paid",
+              "refunded",
+            ],
+          },
+
+          status: {
+            $nin: [
+              "completed",
+              "consultant_assigned",
+              "cancelled",
+            ],
+          },
+        },
+        {
+          $set:
+            bookingUpdate,
+        },
+        {
+          new: true,
+        }
+      );
+
+    /*
+     * A concurrent successful webhook may
+     * have finalized the booking after the
+     * payment update above.
+     */
+
+    if (
+      !updatedBooking
+    ) {
+      const latestBooking =
+        await Booking.findById(
+          booking._id
+        );
+
+      if (
+        latestBooking?.paymentStatus ===
+        "paid"
+      ) {
+        return NextResponse.json({
+          success: true,
+          message:
+            "Payment was already marked as paid.",
+        });
+      }
+
+      if (
+        latestBooking?.paymentStatus ===
+        "refunded"
+      ) {
+        return NextResponse.json({
+          success: true,
+          message:
+            "Payment has already been refunded.",
+        });
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Payment was recorded, but the booking state could not be safely updated.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
 
     /*
      * ==========================================
@@ -340,20 +716,20 @@ export async function POST(
      */
 
     if (
-      booking.consultantId
+      updatedBooking.consultantId
     ) {
       await releaseSlotHold({
         consultantId:
-          booking.consultantId,
+          updatedBooking.consultantId,
 
         date:
-          booking.date,
+          updatedBooking.date,
 
         time:
-          booking.time,
+          updatedBooking.time,
 
         bookingId:
-          booking.bookingId,
+          updatedBooking.bookingId,
       });
     }
 
@@ -370,13 +746,13 @@ export async function POST(
         "Failed payment recorded.",
 
       bookingId:
-        booking.bookingId,
+        updatedBooking.bookingId,
 
       paymentStatus:
-        booking.paymentStatus,
+        updatedBooking.paymentStatus,
 
       bookingStatus:
-        booking.status,
+        updatedBooking.status,
     });
   } catch {
     /*

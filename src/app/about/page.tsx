@@ -523,6 +523,7 @@ export default function AboutPage() {
               alt="Akshaanshh Jyotish consultation"
               fill
               sizes="(max-width: 900px) 100vw, 46vw"
+              loading="lazy"
             />
 
             <div className="about-founder-image-overlay" />

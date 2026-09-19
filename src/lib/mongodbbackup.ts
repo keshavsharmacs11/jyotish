@@ -1,23 +1,17 @@
 import { MongoClient } from "mongodb";
 import mongoose from "mongoose";
 
-const MONGODB_URI: string =
-  (() => {
-    const uri =
-      process.env.MONGODB_URI;
+const uri = process.env.MONGODB_URI;
 
-    if (!uri) {
-      throw new Error(
-        "Please define MONGODB_URI in .env.local"
-      );
-    }
-
-    return uri;
-  })();
+if (!uri) {
+  throw new Error(
+    "Please define MONGODB_URI in .env.local"
+  );
+}
 
 console.log(
   "MONGODB_URI loaded:",
-  Boolean(MONGODB_URI)
+  Boolean(uri)
 );
 
 /*
@@ -41,9 +35,7 @@ declare global {
   var _mongoose:
     | {
         conn: typeof mongoose | null;
-        promise:
-          | Promise<typeof mongoose>
-          | null;
+        promise: Promise<typeof mongoose> | null;
       }
     | undefined;
 }
@@ -56,7 +48,7 @@ declare global {
 if (process.env.NODE_ENV === "development") {
   if (!global._mongoClientPromise) {
     client = new MongoClient(
-      MONGODB_URI,
+      uri,
       options
     );
 
@@ -68,7 +60,7 @@ if (process.env.NODE_ENV === "development") {
     global._mongoClientPromise;
 } else {
   client = new MongoClient(
-    MONGODB_URI,
+    uri,
     options
   );
 
@@ -83,18 +75,13 @@ if (process.env.NODE_ENV === "development") {
  *
  * Our Mongoose models use this connection.
  *
- * The database selected by MONGODB_URI
- * is the authoritative database for:
+ * Example:
  *
+ * Service
  * Booking
- * Payment
  * User
+ * Payment
  * Consultant
- * CustomerSession
- * PasswordResetToken
- * RateLimit
- * SlotHold
- * RazorpayWebhookEvent
  */
 
 const mongooseCache =
@@ -104,8 +91,7 @@ const mongooseCache =
   };
 
 if (process.env.NODE_ENV === "development") {
-  global._mongoose =
-    mongooseCache;
+  global._mongoose = mongooseCache;
 }
 
 export async function connectMongoose() {
@@ -115,7 +101,7 @@ export async function connectMongoose() {
 
   if (!mongooseCache.promise) {
     mongooseCache.promise =
-      mongoose.connect(MONGODB_URI);
+      mongoose.connect(uri);
   }
 
   try {

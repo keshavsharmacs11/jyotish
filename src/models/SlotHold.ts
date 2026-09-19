@@ -1,11 +1,16 @@
 import mongoose, {
   Schema,
-  Document,
   Model,
 } from "mongoose";
 
-export interface ISlotHold
-  extends Document {
+export interface ISlotHold {
+  /**
+   * Slot key:
+   * consultantId|date|time
+   *
+   * The slot key is intentionally a string because
+   * this document uses the slot itself as its MongoDB _id.
+   */
   _id: string;
 
   bookingId: string;
@@ -31,10 +36,10 @@ const SlotHoldSchema =
        *
        * consultantId|date|time
        *
-       * This is the unique identity
-       * of the slot.
+       * MongoDB's _id is unique automatically, so
+       * simultaneous attempts to acquire the exact
+       * same slot cannot both create a hold.
        */
-
       _id: {
         type: String,
         required: true,
@@ -64,15 +69,13 @@ const SlotHoldSchema =
       },
 
       /*
-       * MongoDB TTL automatically removes
-       * expired holds.
+       * MongoDB TTL automatically removes expired
+       * holds after expiresAt is reached.
        *
        * IMPORTANT:
-       * Do not use index: true here because
-       * the TTL index is declared separately
-       * below.
+       * Do not add index: true here because the TTL
+       * index is declared separately below.
        */
-
       expiresAt: {
         type: Date,
         required: true,
@@ -84,15 +87,13 @@ const SlotHoldSchema =
   );
 
 /*
- * Automatically delete the hold once
- * expiresAt is reached.
+ * Automatically remove expired holds.
  *
- * MongoDB's TTL monitor may take a little
- * time to physically remove the document,
- * so application availability checks must
- * ALSO check expiresAt.
+ * The MongoDB TTL monitor is asynchronous, so the
+ * application-level acquire/read logic must still
+ * evaluate expiresAt instead of relying only on the
+ * physical deletion of the document.
  */
-
 SlotHoldSchema.index(
   {
     expiresAt: 1,

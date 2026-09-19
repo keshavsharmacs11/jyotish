@@ -12,7 +12,7 @@ const BLOCKING_STATUSES = [
   "confirmed",
   "consultant_assigned",
   "completed",
-];
+] as const;
 
 function daysInMonth(year: number, month: number) {
   if (month === 2) {
@@ -175,8 +175,8 @@ function legacyToWindows(input: unknown) {
     const date = String(item?.date ?? "").trim();
     if (!isValidDate(date)) continue;
 
-    const times = Array.from(
-      new Set(
+    const times: string[] = Array.from(
+      new Set<string>(
         (Array.isArray(item?.times) ? item.times : [])
           .map((time: unknown) => String(time).trim())
           .filter(isValidTime)

@@ -2,23 +2,40 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { connectMongoose } from "@/lib/mongodb";
 import Booking from "@/models/Booking";
+import { checkRateLimit } from "@/lib/rateLimit";
+import { getClientIp } from "@/lib/requestSecurity";
+
+const BOOKING_ID_PATTERN = /^AKJ-\d{4}-\d{6}$/i;
 
 export async function GET(request: NextRequest) {
   try {
-    const bookingId =
-      request.nextUrl.searchParams.get("bookingId")?.trim() || "";
+    const rateLimit = await checkRateLimit({
+      key: `contact-booking-lookup:${getClientIp(request)}`,
+      limit: 20,
+      windowMs: 15 * 60 * 1000,
+    });
 
-    if (!bookingId) {
+    if (!rateLimit.allowed) {
       return NextResponse.json(
         {
           success: false,
-          message: "Booking ID is required.",
+          message: "Too many booking lookups. Please try again later.",
         },
-        { status: 400 }
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimit.retryAfterSeconds),
+          },
+        }
       );
     }
 
-    if (bookingId.length > 80) {
+    const bookingId =
+      request.nextUrl.searchParams
+        .get("bookingId")
+        ?.trim() || "";
+
+    if (!BOOKING_ID_PATTERN.test(bookingId)) {
       return NextResponse.json(
         {
           success: false,

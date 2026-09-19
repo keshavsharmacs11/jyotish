@@ -41,6 +41,12 @@
     | "nav.loggingOut"
     | "nav.bookConsultation"
     | "nav.trackMyBooking"
+    | "nav.languageSelection"
+    | "nav.mainNavigation"
+    | "nav.mobileNavigation"
+    | "nav.openMenu"
+    | "nav.closeMenu"
+    | "nav.language"
 
     // Common
     | "common.english"
@@ -316,7 +322,17 @@
     | "footer.terms"
     | "footer.refund"
     | "footer.contact"
-    | "footer.copyright";
+    | "footer.copyright"
+    | "footer.home"
+    | "footer.about"
+    | "footer.servicesLink"
+    | "footer.shop"
+    | "footer.contactLink"
+    | "footer.vedicAstrology"
+    | "footer.numerology"
+    | "footer.tarot"
+    | "footer.careerGuidance"
+    | "footer.india";
 
     /*
     * ============================================================
@@ -362,6 +378,12 @@
         "nav.loggingOut": "Logging Out...",
         "nav.bookConsultation": "Book Consultation",
         "nav.trackMyBooking": "Track My Booking",
+        "nav.languageSelection": "Language selection",
+        "nav.mainNavigation": "Main navigation",
+        "nav.mobileNavigation": "Mobile navigation",
+        "nav.openMenu": "Open navigation menu",
+        "nav.closeMenu": "Close navigation menu",
+        "nav.language": "Language",
 
         // Common
         "common.english": "English",
@@ -687,6 +709,16 @@
         "footer.refund": "Cancellation & Refund Policy",
         "footer.contact": "Contact Us",
         "footer.copyright": "All rights reserved.",
+        "footer.home": "Home",
+        "footer.about": "About",
+        "footer.servicesLink": "Services",
+        "footer.shop": "Shop",
+        "footer.contactLink": "Contact",
+        "footer.vedicAstrology": "Vedic Astrology",
+        "footer.numerology": "Numerology",
+        "footer.tarot": "Tarot Reading",
+        "footer.careerGuidance": "Career Guidance",
+        "footer.india": "India",
 
     },
 
@@ -713,6 +745,12 @@
         "nav.loggingOut": "लॉगआउट हो रहा है...",
         "nav.bookConsultation": "परामर्श बुक करें",
         "nav.trackMyBooking": "मेरी बुकिंग ट्रैक करें",
+        "nav.languageSelection": "भाषा चयन",
+        "nav.mainNavigation": "मुख्य नेविगेशन",
+        "nav.mobileNavigation": "मोबाइल नेविगेशन",
+        "nav.openMenu": "नेविगेशन मेनू खोलें",
+        "nav.closeMenu": "नेविगेशन मेनू बंद करें",
+        "nav.language": "भाषा",
 
         // Common
         "common.english": "English",
@@ -1038,6 +1076,16 @@
         "footer.refund": "रद्दीकरण और रिफंड नीति",
         "footer.contact": "संपर्क करें",
         "footer.copyright": "सर्वाधिकार सुरक्षित।",
+        "footer.home": "होम",
+        "footer.about": "हमारे बारे में",
+        "footer.servicesLink": "सेवाएँ",
+        "footer.shop": "शॉप",
+        "footer.contactLink": "संपर्क करें",
+        "footer.vedicAstrology": "वैदिक ज्योतिष",
+        "footer.numerology": "अंक ज्योतिष",
+        "footer.tarot": "टैरो रीडिंग",
+        "footer.careerGuidance": "करियर मार्गदर्शन",
+        "footer.india": "भारत",
     },
     };
 
@@ -1087,6 +1135,14 @@
         );
         }
     }, []);
+
+    /*
+    * Keep the document language synchronized with the active UI language.
+    * This improves screen-reader pronunciation and browser language hints.
+    */
+    useEffect(() => {
+        document.documentElement.lang = language;
+    }, [language]);
 
     /*
     * Change language globally.

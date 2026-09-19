@@ -1,20 +1,63 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 
-import clientPromise from "@/lib/mongodb";
+import { connectMongoose } from "@/lib/mongodb";
+
 import Booking from "@/models/Booking";
 import Payment from "@/models/Payment";
 
-export async function POST(request: Request) {
+import {
+  releaseSlotHold,
+} from "@/lib/slotHold";
+
+/*
+ * =========================================================
+ * RAZORPAY WEBHOOK
+ * =========================================================
+ *
+ * Handles:
+ *
+ * PAYMENT
+ * - payment.captured
+ * - order.paid
+ * - payment.failed
+ *
+ * REFUND
+ * - refund.created
+ * - refund.processed
+ * - refund.failed
+ *
+ * IMPORTANT:
+ *
+ * Razorpay webhook signature is verified against the
+ * ORIGINAL RAW REQUEST BODY.
+ *
+ * Refunds are considered final only after Razorpay
+ * confirms the refund state.
+ */
+
+export async function POST(
+  request: Request
+) {
+  console.log(
+    "🔥 RAZORPAY WEBHOOK REQUEST RECEIVED"
+  );
+
   try {
     /*
-     * ============================================
+     * =====================================================
      * READ RAW BODY
-     * ============================================
+     * =====================================================
      */
 
     const rawBody =
       await request.text();
+
+    /*
+     * =====================================================
+     * WEBHOOK SIGNATURE
+     * =====================================================
+     */
 
     const signature =
       request.headers.get(
@@ -51,9 +94,9 @@ export async function POST(request: Request) {
     }
 
     /*
-     * ============================================
-     * VERIFY WEBHOOK SIGNATURE
-     * ============================================
+     * =====================================================
+     * VERIFY RAZORPAY SIGNATURE
+     * =====================================================
      */
 
     const expectedSignature =
@@ -81,6 +124,10 @@ export async function POST(request: Request) {
       expectedBuffer.length !==
       receivedBuffer.length
     ) {
+      console.error(
+        "Invalid Razorpay webhook signature length."
+      );
+
       return NextResponse.json(
         {
           success: false,
@@ -91,13 +138,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const isValid =
+    const signatureValid =
       crypto.timingSafeEqual(
         expectedBuffer,
         receivedBuffer
       );
 
-    if (!isValid) {
+    if (!signatureValid) {
       console.error(
         "Razorpay webhook signature verification failed."
       );
@@ -113,99 +160,133 @@ export async function POST(request: Request) {
     }
 
     /*
-     * ============================================
-     * PARSE BODY
-     * ============================================
+     * =====================================================
+     * PARSE EVENT
+     * =====================================================
      */
 
-    const event =
-      JSON.parse(rawBody);
+    let event: any;
+
+    try {
+      event =
+        JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Invalid webhook JSON.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const eventName =
+      event?.event;
 
     console.log(
-      "Razorpay webhook received:",
-      event.event
+      "RAZORPAY WEBHOOK:",
+      eventName
     );
 
     /*
-     * ============================================
+     * =====================================================
      * DATABASE
-     * ============================================
+     * =====================================================
      */
 
-    const client =
-      await clientPromise;
-
-    await client
-      .db("codepunkdb")
-      .command({
-        ping: 1,
-      });
+    await connectMongoose();
 
     /*
-     * ============================================
+     * =====================================================
      * PAYMENT CAPTURED
-     * ============================================
+     * =====================================================
+     *
+     * Razorpay can notify payment capture through:
+     *
+     * payment.captured
+     * order.paid
+     *
+     * Both represent a successfully captured payment.
      */
 
     if (
-      event.event ===
+      eventName ===
         "payment.captured" ||
-      event.event ===
+      eventName ===
         "order.paid"
     ) {
-      let paymentEntity: any;
-      let orderId: string | null = null;
-      let paymentId: string | null = null;
+      let orderId:
+        | string
+        | null = null;
+
+      let paymentId:
+        | string
+        | null = null;
 
       /*
-       * ------------------------------------------
+       * -----------------------------------------------------
        * payment.captured
-       * ------------------------------------------
+       * -----------------------------------------------------
        */
 
       if (
-        event.event ===
+        eventName ===
         "payment.captured"
       ) {
-        paymentEntity =
-          event.payload?.payment?.entity;
+        const paymentEntity =
+          event.payload
+            ?.payment
+            ?.entity;
 
         orderId =
-          paymentEntity?.order_id;
+          paymentEntity?.order_id ||
+          null;
 
         paymentId =
-          paymentEntity?.id;
+          paymentEntity?.id ||
+          null;
       }
 
       /*
-       * ------------------------------------------
+       * -----------------------------------------------------
        * order.paid
-       * ------------------------------------------
+       * -----------------------------------------------------
        */
 
       if (
-        event.event ===
+        eventName ===
         "order.paid"
       ) {
         const orderEntity =
-          event.payload?.order?.entity;
+          event.payload
+            ?.order
+            ?.entity;
 
-        const paymentData =
-          event.payload?.payment?.entity;
+        const paymentEntity =
+          event.payload
+            ?.payment
+            ?.entity;
 
         orderId =
-          orderEntity?.id;
+          orderEntity?.id ||
+          paymentEntity?.order_id ||
+          null;
 
         paymentId =
-          paymentData?.id;
-
-        paymentEntity =
-          paymentData;
+          paymentEntity?.id ||
+          null;
       }
+
+      /*
+       * -----------------------------------------------------
+       * VALIDATE ORDER ID
+       * -----------------------------------------------------
+       */
 
       if (!orderId) {
         console.error(
-          "Webhook payment/order ID missing."
+          "Razorpay payment webhook order ID missing."
         );
 
         return NextResponse.json(
@@ -219,9 +300,9 @@ export async function POST(request: Request) {
       }
 
       /*
-       * ==========================================
+       * -----------------------------------------------------
        * FIND PAYMENT
-       * ==========================================
+       * -----------------------------------------------------
        */
 
       const payment =
@@ -230,16 +311,19 @@ export async function POST(request: Request) {
             orderId,
         });
 
+      /*
+       * The webhook may arrive for an order that
+       * does not belong to our application.
+       *
+       * Acknowledge it instead of repeatedly
+       * receiving the same webhook.
+       */
+
       if (!payment) {
         console.error(
-          "Payment record not found for order:",
+          "Payment record not found:",
           orderId
         );
-
-        /*
-         * Acknowledge unknown payment so
-         * Razorpay does not repeatedly retry it.
-         */
 
         return NextResponse.json({
           success: true,
@@ -249,9 +333,9 @@ export async function POST(request: Request) {
       }
 
       /*
-       * ==========================================
+       * -----------------------------------------------------
        * FIND BOOKING
-       * ==========================================
+       * -----------------------------------------------------
        */
 
       const booking =
@@ -261,8 +345,8 @@ export async function POST(request: Request) {
 
       if (!booking) {
         console.error(
-          "Booking not found for payment:",
-          payment._id
+          "Booking not found:",
+          payment.bookingId
         );
 
         return NextResponse.json({
@@ -273,15 +357,39 @@ export async function POST(request: Request) {
       }
 
       /*
-       * ==========================================
-       * IDEMPOTENCY
-       * ==========================================
+       * -----------------------------------------------------
+       * ALREADY PROCESSED
+       * -----------------------------------------------------
+       *
+       * Razorpay can send webhook events more than once.
+       *
+       * If the verification endpoint already processed
+       * the payment, the permanent paid Booking already
+       * protects the slot.
+       *
+       * We still release any leftover temporary hold.
        */
 
       if (
-        payment.status === "paid" &&
-        booking.paymentStatus === "paid"
+        payment.status ===
+          "paid" &&
+        booking.paymentStatus ===
+          "paid"
       ) {
+        await releaseSlotHold({
+          consultantId:
+            booking.consultantId!,
+
+          date:
+            booking.date,
+
+          time:
+            booking.time,
+
+          bookingId:
+            booking.bookingId,
+        });
+
         return NextResponse.json({
           success: true,
           message:
@@ -290,9 +398,9 @@ export async function POST(request: Request) {
       }
 
       /*
-       * ==========================================
-       * PROTECT COMPLETED / CANCELLED BOOKINGS
-       * ==========================================
+       * -----------------------------------------------------
+       * NEVER RESURRECT CANCELLED / COMPLETED BOOKINGS
+       * -----------------------------------------------------
        */
 
       if (
@@ -301,6 +409,11 @@ export async function POST(request: Request) {
         booking.status ===
           "cancelled"
       ) {
+        console.warn(
+          "Payment webhook received for completed/cancelled booking:",
+          booking.bookingId
+        );
+
         return NextResponse.json({
           success: true,
           message:
@@ -309,19 +422,15 @@ export async function POST(request: Request) {
       }
 
       /*
-       * ==========================================
+       * -----------------------------------------------------
        * CLAIM CONSULTANT SLOT
-       * ==========================================
+       * -----------------------------------------------------
        *
-       * Booking.ts contains a partial unique
-       * index:
+       * The unique MongoDB index protects the slot.
        *
-       * consultantId + date + time
-       *
-       * only when paymentStatus === "paid".
-       *
-       * Therefore this save is the point where
-       * MongoDB protects the slot.
+       * If another paid booking already owns the same
+       * consultant/date/time combination, save() will
+       * throw duplicate key error 11000.
        */
 
       try {
@@ -339,9 +448,9 @@ export async function POST(request: Request) {
         await booking.save();
       } catch (error: any) {
         /*
-         * ========================================
-         * DUPLICATE SLOT
-         * ========================================
+         * ---------------------------------------------------
+         * DUPLICATE CONSULTANT SLOT
+         * ---------------------------------------------------
          */
 
         if (
@@ -368,26 +477,23 @@ export async function POST(request: Request) {
           /*
            * IMPORTANT:
            *
-           * Do NOT mark our Payment document
-           * as paid here.
+           * We intentionally do NOT mark our internal
+           * Payment record as paid.
            *
-           * The Razorpay payment itself may
-           * already have been captured, so this
-           * situation requires payment resolution
-           * rather than silently confirming the
-           * booking.
+           * Razorpay has received the money, but our
+           * booking could not claim the requested slot.
            *
-           * We acknowledge the webhook so Razorpay
-           * doesn't endlessly retry the same event.
+           * This still requires the automatic refund
+           * resolution that we will implement next.
            */
 
           return NextResponse.json({
             success: true,
 
+            slotConflict: true,
+
             message:
               "Payment received but the selected consultation slot is already booked. Manual payment resolution is required.",
-
-            slotConflict: true,
 
             bookingId:
               booking.bookingId,
@@ -398,9 +504,9 @@ export async function POST(request: Request) {
       }
 
       /*
-       * ==========================================
-       * UPDATE PAYMENT
-       * ==========================================
+       * -----------------------------------------------------
+       * UPDATE PAYMENT RECORD
+       * -----------------------------------------------------
        */
 
       payment.status =
@@ -411,16 +517,43 @@ export async function POST(request: Request) {
           paymentId;
       }
 
+      /*
+       * A successful new payment must not retain an
+       * old refund state.
+       */
+
+      payment.refundStatus =
+        "none";
+
       await payment.save();
 
       /*
-       * ==========================================
-       * SUCCESS
-       * ==========================================
+       * -----------------------------------------------------
+       * RELEASE TEMPORARY SLOT HOLD
+       * -----------------------------------------------------
+       *
+       * The payment is now successfully recorded.
+       *
+       * The permanent paid Booking protects the slot,
+       * so the temporary hold can be removed.
        */
 
+      await releaseSlotHold({
+        consultantId:
+          booking.consultantId!,
+
+        date:
+          booking.date,
+
+        time:
+          booking.time,
+
+        bookingId:
+          booking.bookingId,
+      });
+
       console.log(
-        "Webhook successfully updated payment and booking:",
+        "PAYMENT CAPTURED:",
         {
           bookingId:
             booking.bookingId,
@@ -449,17 +582,19 @@ export async function POST(request: Request) {
     }
 
     /*
-     * ============================================
+     * =====================================================
      * PAYMENT FAILED
-     * ============================================
+     * =====================================================
      */
 
     if (
-      event.event ===
+      eventName ===
       "payment.failed"
     ) {
       const paymentEntity =
-        event.payload?.payment?.entity;
+        event.payload
+          ?.payment
+          ?.entity;
 
       const orderId =
         paymentEntity?.order_id;
@@ -468,6 +603,10 @@ export async function POST(request: Request) {
         paymentEntity?.id;
 
       if (!orderId) {
+        console.error(
+          "Failed payment webhook order ID missing."
+        );
+
         return NextResponse.json(
           {
             success: false,
@@ -478,6 +617,12 @@ export async function POST(request: Request) {
         );
       }
 
+      /*
+       * -----------------------------------------------------
+       * FIND PAYMENT
+       * -----------------------------------------------------
+       */
+
       const payment =
         await Payment.findOne({
           razorpayOrderId:
@@ -487,152 +632,16 @@ export async function POST(request: Request) {
       if (!payment) {
         return NextResponse.json({
           success: true,
+
           message:
             "Payment record not found; event acknowledged.",
         });
       }
 
       /*
- * ============================================
- * REFUND PROCESSED
- * ============================================
- */
-
-if (
-  event.event ===
-    "refund.processed" ||
-  event.event ===
-    "refund.created" ||
-  event.event ===
-    "refund.failed"
-) {
-  const refundEntity =
-    event.payload?.refund?.entity;
-
-  const refundId =
-    refundEntity?.id;
-
-  const paymentId =
-    refundEntity?.payment_id;
-
-  if (!paymentId) {
-    return NextResponse.json({
-      success: true,
-      message:
-        "Refund event acknowledged; payment ID missing.",
-    });
-  }
-
-  const payment =
-    await Payment.findOne({
-      razorpayPaymentId:
-        paymentId,
-    });
-
-  if (!payment) {
-    return NextResponse.json({
-      success: true,
-      message:
-        "Refund payment record not found; event acknowledged.",
-    });
-  }
-
-  /*
-   * Save Razorpay refund ID.
-   */
-
-  if (refundId) {
-    payment.razorpayRefundId =
-      refundId;
-  }
-
-  /*
-   * REFUND PROCESSED
-   */
-
-  if (
-    event.event ===
-    "refund.processed"
-  ) {
-    payment.refundStatus =
-      "processed";
-
-    payment.status =
-      "refunded";
-
-    const booking =
-      await Booking.findById(
-        payment.bookingId
-      );
-
-    if (booking) {
-      booking.paymentStatus =
-        "refunded";
-
-      /*
-       * Booking should already be cancelled
-       * when the admin initiated the refund.
-       */
-
-      booking.status =
-        "cancelled";
-
-      await booking.save();
-    }
-  }
-
-  /*
-   * REFUND CREATED
-   *
-   * Refund exists but may still be
-   * processing.
-   */
-
-  if (
-    event.event ===
-    "refund.created"
-  ) {
-    payment.refundStatus =
-      "pending";
-  }
-
-        /*
-        * REFUND FAILED
-        */
-
-        if (
-            event.event ===
-            "refund.failed"
-        ) {
-            payment.refundStatus =
-            "failed";
-        }
-
-        await payment.save();
-
-        console.log(
-            "Refund webhook processed:",
-            {
-            event:
-                event.event,
-
-            paymentId,
-
-            refundId,
-            }
-        );
-
-        return NextResponse.json({
-            success: true,
-
-            message:
-            "Refund webhook processed successfully.",
-        });
-        }
-
-      /*
-       * Never turn an already-paid payment
-       * back into failed.
+       * -----------------------------------------------------
+       * NEVER CHANGE PAID → FAILED
+       * -----------------------------------------------------
        */
 
       if (
@@ -641,10 +650,17 @@ if (
       ) {
         return NextResponse.json({
           success: true,
+
           message:
             "Payment already paid; failure ignored.",
         });
       }
+
+      /*
+       * -----------------------------------------------------
+       * UPDATE PAYMENT
+       * -----------------------------------------------------
+       */
 
       payment.status =
         "failed";
@@ -655,6 +671,12 @@ if (
       }
 
       await payment.save();
+
+      /*
+       * -----------------------------------------------------
+       * UPDATE BOOKING
+       * -----------------------------------------------------
+       */
 
       const booking =
         await Booking.findById(
@@ -678,10 +700,33 @@ if (
         }
 
         await booking.save();
+
+        /*
+         * ---------------------------------------------------
+         * RELEASE TEMPORARY SLOT HOLD
+         * ---------------------------------------------------
+         *
+         * Payment failed, so the temporary reservation
+         * can be removed immediately.
+         */
+
+        await releaseSlotHold({
+          consultantId:
+            booking.consultantId!,
+
+          date:
+            booking.date,
+
+          time:
+            booking.time,
+
+          bookingId:
+            booking.bookingId,
+        });
       }
 
       console.log(
-        "Failed payment webhook processed:",
+        "PAYMENT FAILED:",
         {
           orderId,
           paymentId,
@@ -697,183 +742,393 @@ if (
     }
 
     /*
- * ============================================
- * REFUND EVENTS
- * ============================================
- */
+     * =====================================================
+     * REFUND CREATED
+     * =====================================================
+     *
+     * Razorpay has created the refund.
+     *
+     * The refund may still be processing.
+     *
+     * Therefore:
+     *
+     * payment.status       = paid
+     * payment.refundStatus = pending
+     *
+     * We DO NOT mark the payment as refunded here.
+     */
 
-if (
-  event.event ===
-    "refund.created" ||
-  event.event ===
-    "refund.processed" ||
-  event.event ===
-    "refund.failed"
-) {
-  const refundEntity =
-    event.payload?.refund?.entity;
+    if (
+      eventName ===
+      "refund.created"
+    ) {
+      const refundEntity =
+        event.payload
+          ?.refund
+          ?.entity;
 
-  const refundId =
-    refundEntity?.id;
+      const refundId =
+        refundEntity?.id;
 
-  const paymentId =
-    refundEntity?.payment_id;
+      const paymentId =
+        refundEntity?.payment_id;
 
-  /*
-   * ==========================================
-   * PAYMENT ID VALIDATION
-   * ==========================================
-   */
+      if (!paymentId) {
+        console.warn(
+          "Refund created event missing payment ID."
+        );
 
-  if (!paymentId) {
-    console.error(
-      "Refund webhook: payment ID missing."
-    );
+        return NextResponse.json({
+          success: true,
 
-    return NextResponse.json({
-      success: true,
+          message:
+            "Refund event acknowledged; payment ID missing.",
+        });
+      }
 
-      message:
-        "Refund event acknowledged; payment ID missing.",
-    });
-  }
+      /*
+       * -----------------------------------------------------
+       * FIND PAYMENT
+       * -----------------------------------------------------
+       */
 
-  /*
-   * ==========================================
-   * FIND PAYMENT
-   * ==========================================
-   */
+      const payment =
+        await Payment.findOne({
+          razorpayPaymentId:
+            paymentId,
+        });
 
-  const payment =
-    await Payment.findOne({
-      razorpayPaymentId:
-        paymentId,
-    });
+      if (!payment) {
+        console.error(
+          "Refund payment not found:",
+          paymentId
+        );
 
-  if (!payment) {
-    console.error(
-      "Refund webhook: payment record not found.",
-      paymentId
-    );
+        return NextResponse.json({
+          success: true,
 
-    return NextResponse.json({
-      success: true,
+          message:
+            "Refund payment record not found; event acknowledged.",
+        });
+      }
 
-      message:
-        "Refund payment record not found; event acknowledged.",
-    });
-  }
+      /*
+       * -----------------------------------------------------
+       * SAVE REFUND INFORMATION
+       * -----------------------------------------------------
+       */
 
-  /*
-   * ==========================================
-   * SAVE REFUND ID
-   * ==========================================
-   */
+      if (refundId) {
+        payment.razorpayRefundId =
+          refundId;
+      }
 
-  if (refundId) {
-    payment.razorpayRefundId =
-      refundId;
-  }
+      payment.refundStatus =
+        "pending";
 
-  /*
-   * ==========================================
-   * REFUND CREATED
-   * ==========================================
-   *
-   * Refund has been created but may still
-   * be processing.
-   */
+      /*
+       * Keep payment.status = paid.
+       *
+       * The money has not yet reached its final
+       * refund state according to our system.
+       */
 
-  if (
-    event.event ===
-    "refund.created"
-  ) {
-    payment.refundStatus =
-      "pending";
-  }
+      if (
+        payment.status !==
+        "refunded"
+      ) {
+        payment.status =
+          "paid";
+      }
 
-  /*
-   * ==========================================
-   * REFUND PROCESSED
-   * ==========================================
-   *
-   * Razorpay has successfully processed
-   * the refund.
-   */
+      await payment.save();
 
-  if (
-    event.event ===
-    "refund.processed"
-  ) {
-    payment.refundStatus =
-      "processed";
-
-    payment.status =
-      "refunded";
-
-    const booking =
-      await Booking.findById(
-        payment.bookingId
+      console.log(
+        "REFUND CREATED:",
+        {
+          paymentId,
+          refundId,
+        }
       );
 
-    if (booking) {
-      booking.paymentStatus =
-        "refunded";
+      return NextResponse.json({
+        success: true,
 
-      booking.status =
-        "cancelled";
-
-      await booking.save();
+        message:
+          "Refund created webhook processed.",
+      });
     }
-  }
-
-  /*
-   * ==========================================
-   * REFUND FAILED
-   * ==========================================
-   */
-
-  if (
-    event.event ===
-    "refund.failed"
-  ) {
-    payment.refundStatus =
-      "failed";
-  }
-
-  await payment.save();
-
-  /*
-   * ==========================================
-   * SUCCESS
-   * ==========================================
-   */
-
-  console.log(
-    "Refund webhook processed:",
-    {
-      event:
-        event.event,
-
-      paymentId,
-
-      refundId,
-    }
-  );
-
-  return NextResponse.json({
-    success: true,
-
-    message:
-      "Refund webhook processed successfully.",
-  });
-}
 
     /*
-     * ============================================
-     * OTHER EVENTS
-     * ============================================
+     * =====================================================
+     * REFUND PROCESSED
+     * =====================================================
+     *
+     * This is the final successful refund state.
+     *
+     * ONLY HERE do we change:
+     *
+     * Payment:
+     *   status       → refunded
+     *   refundStatus → processed
+     *
+     * Booking:
+     *   paymentStatus → refunded
+     *   status        → cancelled
      */
+
+    if (
+      eventName ===
+      "refund.processed"
+    ) {
+      const refundEntity =
+        event.payload
+          ?.refund
+          ?.entity;
+
+      const refundId =
+        refundEntity?.id;
+
+      const paymentId =
+        refundEntity?.payment_id;
+
+      if (!paymentId) {
+        console.warn(
+          "Refund processed event missing payment ID."
+        );
+
+        return NextResponse.json({
+          success: true,
+
+          message:
+            "Refund processed event acknowledged; payment ID missing.",
+        });
+      }
+
+      /*
+       * -----------------------------------------------------
+       * FIND PAYMENT
+       * -----------------------------------------------------
+       */
+
+      const payment =
+        await Payment.findOne({
+          razorpayPaymentId:
+            paymentId,
+        });
+
+      if (!payment) {
+        console.error(
+          "Refund payment not found:",
+          paymentId
+        );
+
+        return NextResponse.json({
+          success: true,
+
+          message:
+            "Refund payment record not found; event acknowledged.",
+        });
+      }
+
+      /*
+       * -----------------------------------------------------
+       * UPDATE PAYMENT
+       * -----------------------------------------------------
+       */
+
+      if (refundId) {
+        payment.razorpayRefundId =
+          refundId;
+      }
+
+      payment.refundStatus =
+        "processed";
+
+      payment.status =
+        "refunded";
+
+      await payment.save();
+
+      /*
+       * -----------------------------------------------------
+       * UPDATE BOOKING
+       * -----------------------------------------------------
+       */
+
+      const booking =
+        await Booking.findById(
+          payment.bookingId
+        );
+
+      if (booking) {
+        booking.paymentStatus =
+          "refunded";
+
+        booking.status =
+          "cancelled";
+
+        await booking.save();
+      }
+
+      console.log(
+        "REFUND PROCESSED:",
+        {
+          paymentId,
+          refundId,
+
+          bookingId:
+            booking?.bookingId,
+        }
+      );
+
+      return NextResponse.json({
+        success: true,
+
+        message:
+          "Refund processed successfully.",
+
+        paymentId,
+
+        refundId,
+
+        bookingId:
+          booking?.bookingId,
+      });
+    }
+
+    /*
+     * =====================================================
+     * REFUND FAILED
+     * =====================================================
+     *
+     * A failed refund does NOT mean the payment failed.
+     *
+     * Therefore:
+     *
+     * payment.status       remains paid
+     * payment.refundStatus becomes failed
+     *
+     * booking.paymentStatus remains paid
+     *
+     * This allows the admin to investigate/retry
+     * the refund without our database falsely
+     * claiming that the customer received money.
+     */
+
+    if (
+      eventName ===
+      "refund.failed"
+    ) {
+      const refundEntity =
+        event.payload
+          ?.refund
+          ?.entity;
+
+      const refundId =
+        refundEntity?.id;
+
+      const paymentId =
+        refundEntity?.payment_id;
+
+      if (!paymentId) {
+        console.warn(
+          "Refund failed event missing payment ID."
+        );
+
+        return NextResponse.json({
+          success: true,
+
+          message:
+            "Refund failed event acknowledged; payment ID missing.",
+        });
+      }
+
+      /*
+       * -----------------------------------------------------
+       * FIND PAYMENT
+       * -----------------------------------------------------
+       */
+
+      const payment =
+        await Payment.findOne({
+          razorpayPaymentId:
+            paymentId,
+        });
+
+      if (!payment) {
+        console.error(
+          "Refund payment not found:",
+          paymentId
+        );
+
+        return NextResponse.json({
+          success: true,
+
+          message:
+            "Refund payment record not found; event acknowledged.",
+        });
+      }
+
+      /*
+       * -----------------------------------------------------
+       * UPDATE REFUND STATUS
+       * -----------------------------------------------------
+       */
+
+      if (refundId) {
+        payment.razorpayRefundId =
+          refundId;
+      }
+
+      payment.refundStatus =
+        "failed";
+
+      /*
+       * DO NOT change:
+       *
+       * payment.status
+       *
+       * It should remain "paid" because the original
+       * payment succeeded and the refund failed.
+       */
+
+      if (
+        payment.status !==
+        "refunded"
+      ) {
+        payment.status =
+          "paid";
+      }
+
+      await payment.save();
+
+      console.error(
+        "REFUND FAILED:",
+        {
+          paymentId,
+          refundId,
+        }
+      );
+
+      return NextResponse.json({
+        success: true,
+
+        message:
+          "Refund failed webhook processed.",
+      });
+    }
+
+    /*
+     * =====================================================
+     * OTHER EVENTS
+     * =====================================================
+     */
+
+    console.log(
+      "Unhandled Razorpay webhook:",
+      eventName
+    );
 
     return NextResponse.json({
       success: true,
@@ -882,17 +1137,18 @@ if (
         "Webhook event acknowledged.",
 
       event:
-        event.event,
+        eventName,
     });
   } catch (error) {
     console.error(
-      "Razorpay webhook error:",
+      "RAZORPAY WEBHOOK ERROR:",
       error
     );
 
     return NextResponse.json(
       {
         success: false,
+
         error:
           "Unable to process Razorpay webhook.",
       },

@@ -33,14 +33,7 @@ html {
   --color-border: #e4dac6;
 
   /* Layout */
-  --container-width: 1200px;
-  --container-max: 1200px;
-  --page-gutter: clamp(16px, 3vw, 32px);
-  --section-y: clamp(56px, 7vw, 88px);
-  --section-y-compact: clamp(40px, 5vw, 56px);
-  --content-max: 72ch;
-  --grid-gap: 24px;
-  --header-height: 88px;
+--container-width: 1440px;
 
   /* Shape */
   --radius-small: 8px;
@@ -91,16 +84,16 @@ button {
    ============================================ */
 
 .site-container {
-  width: min(calc(100% - 2 * var(--page-gutter)), var(--container-max));
+  width: min(100% - 40px, var(--container-width));
   margin-inline: auto;
 }
 
 .section {
-  padding-block: var(--section-y);
+  padding: 96px 0;
 }
 
 .section-small {
-  padding-block: var(--section-y-compact);
+  padding: 64px 0;
 }
 
 /* ============================================
@@ -205,7 +198,15 @@ button {
 
 @media (max-width: 768px) {
   .site-container {
-    width: min(calc(100% - 2 * var(--page-gutter)), var(--container-max));
+    width: min(100% - 28px, var(--container-width));
+  }
+
+  .section {
+    padding: 72px 0;
+  }
+
+  .section-small {
+    padding: 48px 0;
   }
 }
 
@@ -34818,6 +34819,217 @@ transition: none !important;
     rgba(201, 166, 94, 0.65);
 
   outline-offset: 2px;
+}
+@import "tailwindcss";
+
+html {
+  scroll-behavior: auto;
+  scroll-padding-top: 96px;
+}
+
+/* ============================================
+   AKSHAANSHH JYOTISH — GLOBAL DESIGN SYSTEM
+   ============================================ */
+
+:root {
+  /* Primary brand colours */
+  --color-midnight: #07182a;
+  --color-navy: #0d2238;
+  --color-navy-soft: #142f4b;
+
+  /* Gold accents */
+  --color-gold: #d6a63b;
+  --color-gold-light: #e7c36c;
+  --color-gold-dark: #ad7c1d;
+
+  /* Warm neutral surfaces */
+  --color-ivory: #faf7ef;
+  --color-cream: #f4eddd;
+  --color-white: #ffffff;
+
+  /* Text */
+  --color-charcoal: #292929;
+  --color-muted: #6f6a61;
+
+  /* Borders */
+  --color-border: #e4dac6;
+
+  /* Layout */
+--container-width: 1440px;
+
+  /* Shape */
+  --radius-small: 8px;
+  --radius-medium: 16px;
+  --radius-large: 28px;
+
+  /* Effects */
+  --shadow-soft: 0 10px 40px rgba(7, 24, 42, 0.08);
+  --shadow-card: 0 12px 35px rgba(7, 24, 42, 0.1);
+}
+
+/* ============================================
+   BASE
+   ============================================ */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ivory);
+  color: var(--color-charcoal);
+  font-family: var(--font-body), Arial, sans-serif;
+  line-height: 1.6;
+
+  overflow-x: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* ============================================
+   SHARED LAYOUT
+   ============================================ */
+
+.site-container {
+  width: min(100% - 40px, var(--container-width));
+  margin-inline: auto;
+}
+
+.section {
+  padding: 96px 0;
+}
+
+.section-small {
+  padding: 64px 0;
+}
+
+/* ============================================
+   TYPOGRAPHY
+   ============================================ */
+
+.eyebrow {
+  color: var(--color-gold-dark);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.display-heading {
+  color: var(--color-midnight);
+  font-family: var(--font-heading), Georgia, serif;
+  font-size: clamp(2.6rem, 6vw, 5.2rem);
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.section-heading {
+  color: var(--color-midnight);
+  font-family: var(--font-heading), Georgia, serif;  font-size: clamp(2rem, 4vw, 3.4rem);
+  font-weight: 500;
+  line-height: 1.15;
+}
+
+/* ============================================
+   BUTTONS
+   ============================================ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  min-height: 48px;
+  padding: 0 22px;
+
+  border: 1px solid transparent;
+  border-radius: var(--radius-small);
+
+  font-size: 0.92rem;
+  font-weight: 600;
+
+  transition:
+    transform 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+}
+
+.btn-primary {
+  background: linear-gradient(
+    135deg,
+    var(--color-gold-light),
+    var(--color-gold)
+  );
+
+  color: #17130b;
+
+  box-shadow: 0 8px 24px rgba(214, 166, 59, 0.22);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 12px 30px rgba(214, 166, 59, 0.32);
+}
+
+.btn-secondary {
+  background: var(--color-midnight);
+  color: var(--color-white);
+}
+
+.btn-outline {
+  background: transparent;
+  border-color: var(--color-border);
+  color: #ffffff;
+}
+
+/* ============================================
+   CARDS
+   ============================================ */
+
+.surface-card {
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-soft);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+  .site-container {
+    width: min(100% - 28px, var(--container-width));
+  }
+
+  .section {
+    padding: 72px 0;
+  }
+
+  .section-small {
+    padding: 48px 0;
+  }
 }
 
 /* ============================================
@@ -70006,289 +70218,6 @@ transition: none !important;
 
   .legal-standalone-nav a:hover,
   .legal-link-row a:hover {
-    transform: none;
-  }
-}
-
-
-/* =========================================================
-   STEP 19 — MOBILE ADMIN + HOMEPAGE FEEDBACK RESTORATION
-   Additive-only override.
-   Existing architecture and component behavior are preserved.
-   ========================================================= */
-
-/* ---------- Admin mobile navigation ---------- */
-/*
- * The existing AdminShell already provides the mobile drawer.
- * These overrides only make the page names reliably visible
- * inside that drawer and keep the navigation independently scrollable.
- */
-@media (max-width: 1024px) {
-  .admin-sidebar {
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(214, 166, 59, 0.42) transparent;
-  }
-
-  .admin-sidebar::-webkit-scrollbar {
-    width: 5px;
-  }
-
-  .admin-sidebar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .admin-sidebar::-webkit-scrollbar-thumb {
-    background: rgba(214, 166, 59, 0.42);
-    border-radius: 999px;
-  }
-
-  .admin-sidebar .admin-sidebar-section,
-  .admin-sidebar .admin-sidebar-label,
-  .admin-sidebar .admin-sidebar-nav {
-    display: block !important;
-  }
-
-  .admin-sidebar .admin-nav-item {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    gap: 14px !important;
-    width: 100% !important;
-    min-height: 50px;
-    padding-inline: 15px !important;
-    white-space: normal !important;
-  }
-
-  .admin-sidebar .admin-nav-item > span:last-child {
-    display: inline !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-  }
-
-  .admin-sidebar .admin-nav-icon {
-    display: inline-flex !important;
-    flex: 0 0 25px;
-  }
-
-  .admin-sidebar .admin-sidebar-label {
-    display: block !important;
-    visibility: visible !important;
-  }
-
-  .admin-sidebar-bottom {
-    margin-top: 24px;
-    flex-shrink: 0;
-  }
-}
-
-/* ---------- Consultant invite manager — mobile ---------- */
-/*
- * ConsultantInviteManager uses a two-column inline grid.
- * Override only its responsive presentation; no invitation logic changes.
- */
-@media (max-width: 900px) {
-  #consultant-invite-manager {
-    grid-template-columns: minmax(0, 1fr) !important;
-    gap: 16px !important;
-    margin-bottom: 22px !important;
-  }
-
-  #consultant-invite-manager .admin-consultant-form-card,
-  #consultant-invite-manager .admin-consultants-table-card {
-    width: 100% !important;
-    min-width: 0 !important;
-  }
-
-  #consultant-invite-manager .admin-consultant-form-header {
-    gap: 14px;
-  }
-
-  #consultant-invite-manager .admin-consultant-form-grid {
-    grid-template-columns: minmax(0, 1fr) !important;
-    gap: 14px !important;
-  }
-
-  #consultant-invite-manager .admin-consultant-form-actions {
-    flex-direction: column-reverse !important;
-    align-items: stretch !important;
-    width: 100%;
-  }
-
-  #consultant-invite-manager .admin-consultant-form-actions > button {
-    width: 100%;
-    min-width: 0;
-  }
-
-  #consultant-invite-manager .admin-consultants-table-header {
-    gap: 10px;
-  }
-}
-
-@media (max-width: 600px) {
-  #consultant-invite-manager {
-    gap: 14px !important;
-  }
-
-  #consultant-invite-manager .admin-consultant-form-card {
-    padding: 20px 16px !important;
-    border-radius: 18px;
-  }
-
-  #consultant-invite-manager .admin-consultant-form-header h2 {
-    font-size: 1.45rem;
-    line-height: 1.2;
-  }
-
-  #consultant-invite-manager .admin-consultant-form-header p {
-    font-size: 0.82rem;
-    line-height: 1.65;
-  }
-
-  #consultant-invite-manager .admin-consultant-form {
-    gap: 18px;
-  }
-
-  #consultant-invite-manager .admin-consultant-form-actions {
-    gap: 9px;
-  }
-
-  #consultant-invite-manager .admin-consultant-cancel,
-  #consultant-invite-manager .admin-consultant-submit {
-    min-height: 48px;
-    padding-inline: 14px;
-  }
-}
-
-/* ---------- Homepage feedback / testimonial cards ---------- */
-/*
- * Restores the premium golden feedback-card treatment while
- * preserving the existing testimonial markup.
- */
-.testimonial-grid {
-  align-items: stretch;
-}
-
-.testimonial-card {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  min-width: 0;
-  text-align: center !important;
-  background:
-    radial-gradient(
-      circle at 100% 0%,
-      rgba(231, 195, 108, 0.20),
-      transparent 32%
-    ),
-    linear-gradient(
-      145deg,
-      #fffdf8 0%,
-      #faf3df 52%,
-      #f3e4bd 100%
-    ) !important;
-  border: 1px solid rgba(214, 166, 59, 0.42) !important;
-  box-shadow:
-    0 14px 38px rgba(7, 24, 42, 0.08),
-    0 2px 10px rgba(214, 166, 59, 0.08) !important;
-  transition:
-    transform 260ms ease,
-    border-color 260ms ease,
-    box-shadow 260ms ease;
-}
-
-/* Keep the existing quotation mark above the card surface. */
-.testimonial-card::before {
-  z-index: 0;
-  color: rgba(173, 124, 29, 0.16) !important;
-}
-
-/* Golden light sweep — purely decorative. */
-.testimonial-card::after {
-  content: "";
-  position: absolute;
-  top: -20%;
-  left: -75%;
-  z-index: 0;
-  width: 46%;
-  height: 140%;
-  pointer-events: none;
-  transform: rotate(18deg);
-  background:
-    linear-gradient(
-      90deg,
-      transparent,
-      rgba(255, 255, 255, 0.72),
-      rgba(231, 195, 108, 0.34),
-      transparent
-    );
-  opacity: 0;
-  transition:
-    left 700ms ease,
-    opacity 220ms ease;
-}
-
-.testimonial-card > * {
-  position: relative;
-  z-index: 1;
-}
-
-.testimonial-card:hover {
-  transform: translateY(-7px);
-  border-color: rgba(214, 166, 59, 0.72) !important;
-  box-shadow:
-    0 20px 48px rgba(7, 24, 42, 0.12),
-    0 0 24px rgba(214, 166, 59, 0.12) !important;
-}
-
-.testimonial-card:hover::after {
-  left: 135%;
-  opacity: 1;
-}
-
-.testimonial-rating {
-  margin-bottom: 17px;
-  color: var(--color-gold) !important;
-  text-align: center;
-  letter-spacing: 4px;
-  text-shadow: 0 2px 10px rgba(214, 166, 59, 0.18);
-}
-
-.testimonial-review {
-  max-width: 42ch;
-  margin-inline: auto !important;
-  color: #625b50 !important;
-  text-align: center !important;
-}
-
-.testimonial-card h3,
-.testimonial-card > span:last-child {
-  text-align: center;
-}
-
-.testimonial-card h3 {
-  color: var(--color-midnight) !important;
-}
-
-.testimonial-card > span:last-child {
-  color: var(--color-gold-dark) !important;
-}
-
-@media (max-width: 760px) {
-  .testimonial-card {
-    padding: 26px 22px !important;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .testimonial-card,
-  .testimonial-card::after {
-    transition: none !important;
-  }
-
-  .testimonial-card:hover {
     transform: none;
   }
 }

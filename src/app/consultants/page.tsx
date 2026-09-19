@@ -176,6 +176,8 @@ export default function ConsultantsPage() {
                         src={consultant.photo}
                         alt={consultant.name}
                         className="consultant-photo"
+                        loading="lazy"
+                        decoding="async"
                       />
                     ) : (
                       <div

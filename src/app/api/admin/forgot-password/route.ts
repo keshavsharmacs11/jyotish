@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 
 import { connectMongoose } from "@/lib/mongodb";
@@ -10,83 +10,152 @@ import {
   sendPasswordResetEmail,
 } from "@/lib/email";
 
-export async function POST(
-  request: Request
-) {
+import {
+  checkRateLimit,
+} from "@/lib/rateLimit";
+
+import {
+  getClientIp,
+} from "@/lib/requestSecurity";
+
+const MAX_REQUEST_BODY_BYTES = 32 * 1024;
+
+function genericResponse() {
+  return NextResponse.json({
+    success: true,
+    message:
+      "If an administrator account exists with this email, a password reset link will be sent.",
+  });
+}
+
+export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const clientIp = getClientIp(request);
 
-    const normalizedEmail =
-      String(body.email || "")
-        .trim()
-        .toLowerCase();
+    const ipLimit = await checkRateLimit({
+      key: `admin-forgot-password-ip:${clientIp}`,
+      limit: 5,
+      windowMs: 15 * 60 * 1000,
+    });
 
-    /*
-     * ============================================
-     * BASIC VALIDATION
-     * ============================================
-     */
-
-    if (!normalizedEmail) {
+    if (!ipLimit.allowed) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "Email address is required.",
+            "Too many password reset requests. Please try again later.",
         },
         {
-          status: 400,
+          status: 429,
+          headers: {
+            "Retry-After": String(
+              ipLimit.retryAfterSeconds
+            ),
+          },
         }
       );
     }
 
-    /*
-     * ============================================
-     * DATABASE
-     * ============================================
-     */
+    const contentLength = request.headers.get("content-length");
+    if (
+      contentLength &&
+      (!Number.isFinite(Number(contentLength)) ||
+        Number(contentLength) > MAX_REQUEST_BODY_BYTES)
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Request is too large." },
+        { status: 413 }
+      );
+    }
+
+    let body: unknown;
+    try {
+      const rawBody = await request.text();
+
+      if (
+        Buffer.byteLength(rawBody, "utf8") >
+        MAX_REQUEST_BODY_BYTES
+      ) {
+        return NextResponse.json(
+          { success: false, error: "Request is too large." },
+          { status: 413 }
+        );
+      }
+
+      body = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid request." },
+        { status: 400 }
+      );
+    }
+
+    if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body)
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Invalid request." },
+        { status: 400 }
+      );
+    }
+
+    const email = String(
+      (body as Record<string, unknown>).email || ""
+    )
+      .trim()
+      .toLowerCase();
+
+    if (!email || email.length > 320) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Email address is required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const emailLimit = await checkRateLimit({
+      key: `admin-forgot-password-email:${email}`,
+      limit: 3,
+      windowMs: 15 * 60 * 1000,
+    });
+
+    if (!emailLimit.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Too many password reset requests. Please try again later.",
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(
+              emailLimit.retryAfterSeconds
+            ),
+          },
+        }
+      );
+    }
 
     await connectMongoose();
 
-    /*
-     * ============================================
-     * FIND ADMIN
-     * ============================================
-     *
-     * IMPORTANT:
-     * Only users with role === "admin"
-     * can use this reset flow.
-     */
-
-    const user =
-      await User.findOne({
-        email: normalizedEmail,
-        role: "admin",
-      });
+    const user = await User.findOne({
+      email,
+      role: "admin",
+    });
 
     /*
-     * ============================================
-     * SECURITY
-     * ============================================
-     *
-     * Do not reveal whether an admin account
-     * exists.
+     * Do not distinguish between an unknown admin email and
+     * an email-delivery failure. This keeps the endpoint
+     * resistant to account-enumeration timing/status checks.
      */
-
     if (!user) {
-      return NextResponse.json({
-        success: true,
-
-        message:
-          "If an administrator account exists with this email, a password reset link will be sent.",
-      });
+      return genericResponse();
     }
-
-    /*
-     * ============================================
-     * INVALIDATE OLD TOKENS
-     * ============================================
-     */
 
     await PasswordResetToken.updateMany(
       {
@@ -94,134 +163,80 @@ export async function POST(
         used: false,
       },
       {
-        $set: {
-          used: true,
-        },
+        $set: { used: true },
       }
     );
 
-    /*
-     * ============================================
-     * GENERATE SECURE TOKEN
-     * ============================================
-     */
+    const token = crypto.randomBytes(32).toString("hex");
 
-    const rawToken =
-      crypto.randomBytes(32);
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
 
-    const token =
-      rawToken.toString("hex");
+    const expiresAt = new Date(
+      Date.now() + 30 * 60 * 1000
+    );
 
-    /*
-     * Store only the SHA-256 hash.
-     *
-     * The raw token is sent through the
-     * reset URL but never stored in MongoDB.
-     */
+    const resetToken =
+      await PasswordResetToken.create({
+        userId: user._id,
+        tokenHash,
+        expiresAt,
+        used: false,
+      });
 
-    const tokenHash =
-      crypto
-        .createHash("sha256")
-        .update(token)
-        .digest("hex");
+    const baseUrl = (
+      process.env.NEXT_PUBLIC_APP_URL ||
+      ""
+    ).replace(/\/+$/, "");
 
-    /*
-     * ============================================
-     * TOKEN EXPIRATION
-     * ============================================
-     *
-     * 30 minutes.
-     */
-
-    const expiresAt =
-      new Date(
-        Date.now() +
-          30 * 60 * 1000
+    if (!baseUrl) {
+      console.error(
+        "NEXT_PUBLIC_APP_URL is not configured."
       );
 
-    await PasswordResetToken.create({
-      userId: user._id,
-      tokenHash,
-      expiresAt,
-      used: false,
-    });
+      await PasswordResetToken.updateOne(
+        { _id: resetToken._id },
+        { $set: { used: true } }
+      );
 
-    /*
-     * ============================================
-     * RESET URL
-     * ============================================
-     */
-
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ||
-      "http://localhost:3000";
+      return genericResponse();
+    }
 
     const resetUrl =
-      `${baseUrl}/admin/reset-password?token=${token}`;
-
-    /*
-     * ============================================
-     * SEND EMAIL
-     * ============================================
-     */
+      `${baseUrl}/admin/reset-password?token=${encodeURIComponent(token)}`;
 
     try {
       await sendPasswordResetEmail({
-        email: normalizedEmail,
-
-        name:
-          user.name ||
-          "Administrator",
-
+        email,
+        name: user.name || "Administrator",
         resetUrl,
       });
     } catch (error) {
+      await PasswordResetToken.updateOne(
+        { _id: resetToken._id },
+        { $set: { used: true } }
+      );
+
       console.error(
-        "ADMIN PASSWORD RESET EMAIL ERROR:",
+        "ADMIN PASSWORD RESET EMAIL DELIVERY FAILED:",
         error
       );
 
-      return NextResponse.json(
-        {
-          success: false,
-
-          error:
-            "Unable to send the password reset email.",
-        },
-        {
-          status: 500,
-        }
-      );
+      return genericResponse();
     }
 
-    /*
-     * ============================================
-     * SUCCESS
-     * ============================================
-     */
-
-    return NextResponse.json({
-      success: true,
-
-      message:
-        "If an administrator account exists with this email, a password reset link will be sent.",
-    });
+    return genericResponse();
   } catch (error) {
-    console.error(
-      "ADMIN FORGOT PASSWORD ERROR:",
-      error
-    );
-
+    console.error("ADMIN FORGOT PASSWORD ERROR:", error);
     return NextResponse.json(
       {
         success: false,
-
         error:
           "Unable to process the password reset request.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }

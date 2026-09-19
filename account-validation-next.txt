@@ -1,0 +1,1385 @@
+﻿"use client";
+
+import {
+  FormEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
+import Link from "next/link";
+
+import PageHero from "@/components/shared/PageHero";
+
+export default function CustomerLoginPage() {
+  const [email, setEmail] =
+    useState("");
+
+  const [password, setPassword] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  const [showPassword, setShowPassword] =
+    useState(false);
+
+  const loginCardRef =
+    useRef<HTMLDivElement>(null);
+
+  /*
+   * ============================================
+   * AUTO SCROLL TO LOGIN
+   * ============================================
+   */
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loginCardRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, []);
+
+  /*
+   * ============================================
+   * LOGIN
+   * ============================================
+   */
+
+  const handleLogin =
+    async (
+      event: FormEvent
+    ) => {
+      event.preventDefault();
+
+      setError("");
+
+      if (!email.trim()) {
+        setError(
+          "Email address is required."
+        );
+
+        return;
+      }
+
+      if (!password) {
+        setError(
+          "Password is required."
+        );
+
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        const response =
+          await fetch(
+            "/api/account/login",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body: JSON.stringify({
+                email:
+                  email.trim(),
+                password,
+              }),
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+          throw new Error(
+            data.error ||
+              "Unable to log in."
+          );
+        }
+
+        /*
+         * Login successful.
+         *
+         * The API has already created
+         * the customer session cookie.
+         */
+
+        window.location.href =
+          "/my-bookings";
+      } catch (error) {
+        console.error(
+          "CUSTOMER LOGIN ERROR:",
+          error
+        );
+
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Unable to log in."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+  return (
+    <>
+      <PageHero
+        eyebrow="CUSTOMER ACCOUNT"
+        title="Welcome Back"
+        description="Sign in to manage your consultation bookings and view your appointment details."
+      />
+
+      <section className="section">
+        <div className="site-container">
+
+          <div
+            ref={loginCardRef}
+            className="booking-summary-card"
+            style={{
+              maxWidth:
+                "600px",
+              margin:
+                "0 auto",
+            }}
+          >
+
+            <div className="booking-header">
+
+              <p className="eyebrow">
+                CUSTOMER LOGIN
+              </p>
+
+              <h2 className="section-heading">
+                Sign in to your account
+              </h2>
+
+              <p className="section-description">
+                Use the email address and
+                password associated with
+                your customer account.
+              </p>
+
+            </div>
+
+            <div className="booking-summary-divider" />
+
+            <form
+              onSubmit={
+                handleLogin
+              }
+            >
+
+              <div
+                style={{
+                  display:
+                    "flex",
+                  flexDirection:
+                    "column",
+                  gap: "20px",
+                }}
+              >
+
+                {/* EMAIL */}
+
+                <div>
+
+                  <label
+                    htmlFor="email"
+                    style={{
+                      display:
+                        "block",
+                      marginBottom:
+                        "8px",
+                    }}
+                  >
+                    Email Address
+                  </label>
+
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(
+                      event
+                    ) =>
+                      setEmail(
+                        event.target.value
+                      )
+                    }
+                    placeholder="Enter your email"
+                    autoComplete="email"
+                    required
+                    disabled={
+                      loading
+                    }
+                    style={{
+                      width:
+                        "100%",
+                      padding:
+                        "14px 16px",
+                      border:
+                        "1px solid #ddd",
+                      borderRadius:
+                        "8px",
+                      fontSize:
+                        "16px",
+                    }}
+                  />
+
+                </div>
+
+                {/* PASSWORD */}
+
+                <div>
+
+                  <label
+                    htmlFor="password"
+                    style={{
+                      display:
+                        "block",
+                      marginBottom:
+                        "8px",
+                    }}
+                  >
+                    Password
+                  </label>
+
+                  <div
+                    style={{
+                      position:
+                        "relative",
+                    }}
+                  >
+
+                    <input
+                      id="password"
+                      type={
+                        showPassword
+                          ? "text"
+                          : "password"
+                      }
+                      value={password}
+                      onChange={(
+                        event
+                      ) =>
+                        setPassword(
+                          event.target.value
+                        )
+                      }
+                      placeholder="Enter your password"
+                      autoComplete="current-password"
+                      required
+                      disabled={
+                        loading
+                      }
+                      style={{
+                        width:
+                          "100%",
+                        padding:
+                          "14px 50px 14px 16px",
+                        border:
+                          "1px solid #ddd",
+                        borderRadius:
+                          "8px",
+                        fontSize:
+                          "16px",
+                      }}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowPassword(
+                          (
+                            current
+                          ) =>
+                            !current
+                        )
+                      }
+                      aria-label={
+                        showPassword
+                          ? "Hide password"
+                          : "Show password"
+                      }
+                      style={{
+                        position:
+                          "absolute",
+                        right:
+                          "14px",
+                        top:
+                          "50%",
+                        transform:
+                          "translateY(-50%)",
+                        background:
+                          "transparent",
+                        border:
+                          "none",
+                        cursor:
+                          "pointer",
+                        padding:
+                          "4px",
+                        fontSize:
+                          "18px",
+                      }}
+                    >
+                      {showPassword
+                        ? "ðŸ™ˆ"
+                        : "ðŸ‘"}
+                    </button>
+
+                  </div>
+
+                </div>
+
+                {/* FORGOT PASSWORD */}
+
+                <div
+                  style={{
+                    textAlign:
+                      "right",
+                  }}
+                >
+
+                  <Link
+                    href="/account/forgot-password"
+                    style={{
+                      textDecoration:
+                        "underline",
+                    }}
+                  >
+                    Forgot password?
+                  </Link>
+
+                </div>
+
+                {/* ERROR */}
+
+                {error && (
+                  <div
+                    style={{
+                      padding:
+                        "12px 16px",
+                      borderRadius:
+                        "8px",
+                      background:
+                        "#fff1f1",
+                      color:
+                        "#b42318",
+                    }}
+                  >
+                    {error}
+                  </div>
+                )}
+
+                {/* LOGIN */}
+
+                <div
+                  className="booking-next"
+                  style={{
+                    marginTop:
+                      "5px",
+                  }}
+                >
+
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={
+                      loading
+                    }
+                  >
+                    {loading
+                      ? "Signing In..."
+                      : "Sign In â†’"}
+                  </button>
+
+                </div>
+
+              </div>
+
+            </form>
+
+            <div
+              className="booking-summary-divider"
+              style={{
+                marginTop:
+                  "30px",
+              }}
+            />
+
+            <div
+              style={{
+                textAlign:
+                  "center",
+              }}
+            >
+
+              <p>
+                Don't have an account yet?
+              </p>
+
+              <p
+                style={{
+                  marginTop:
+                    "8px",
+                }}
+              >
+                Your account is normally
+                created after completing
+                your first paid booking.
+              </p>
+
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+    </>
+  );
+}
+"use client";
+
+import {
+  FormEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
+import Link from "next/link";
+
+import PageHero from "@/components/shared/PageHero";
+
+export default function ForgotPasswordPage() {
+  const [email, setEmail] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [message, setMessage] =
+    useState("");
+
+  const [error, setError] =
+    useState("");
+
+  const formCardRef =
+    useRef<HTMLDivElement>(null);
+
+  /*
+   * ============================================
+   * SCROLL TO FORM
+   * ============================================
+   */
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      formCardRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, []);
+
+  /*
+   * ============================================
+   * SUBMIT
+   * ============================================
+   */
+
+  const handleSubmit =
+    async (
+      event: FormEvent
+    ) => {
+      event.preventDefault();
+
+      setMessage("");
+      setError("");
+
+      if (!email.trim()) {
+        setError(
+          "Email address is required."
+        );
+
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        const response =
+          await fetch(
+            "/api/account/forgot-password",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body: JSON.stringify({
+                email:
+                  email.trim(),
+              }),
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+          throw new Error(
+            data.error ||
+              "Unable to process your request."
+          );
+        }
+
+        setMessage(
+          data.message
+        );
+      } catch (error) {
+        console.error(
+          "FORGOT PASSWORD ERROR:",
+          error
+        );
+
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Unable to process your request."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+  return (
+    <>
+      <PageHero
+        eyebrow="ACCOUNT RECOVERY"
+        title="Forgot Your Password?"
+        description="Enter your email address and we'll help you regain access to your customer account."
+      />
+
+      <section className="section">
+        <div className="site-container">
+
+          <div
+            ref={formCardRef}
+            className="booking-summary-card"
+            style={{
+              maxWidth:
+                "600px",
+              margin:
+                "0 auto",
+            }}
+          >
+
+            <div className="booking-header">
+
+              <p className="eyebrow">
+                PASSWORD RESET
+              </p>
+
+              <h2 className="section-heading">
+                Reset your password
+              </h2>
+
+              <p className="section-description">
+                Enter the email address
+                associated with your
+                account.
+              </p>
+
+            </div>
+
+            <div className="booking-summary-divider" />
+
+            <form
+              onSubmit={
+                handleSubmit
+              }
+            >
+
+              <div
+                style={{
+                  display:
+                    "flex",
+                  flexDirection:
+                    "column",
+                  gap: "20px",
+                }}
+              >
+
+                {/* EMAIL */}
+
+                <div>
+
+                  <label
+                    htmlFor="email"
+                    style={{
+                      display:
+                        "block",
+                      marginBottom:
+                        "8px",
+                    }}
+                  >
+                    Email Address
+                  </label>
+
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(
+                      event
+                    ) =>
+                      setEmail(
+                        event.target.value
+                      )
+                    }
+                    placeholder="Enter your email"
+                    autoComplete="email"
+                    required
+                    disabled={
+                      loading
+                    }
+                    style={{
+                      width:
+                        "100%",
+                      padding:
+                        "14px 16px",
+                      border:
+                        "1px solid #ddd",
+                      borderRadius:
+                        "8px",
+                      fontSize:
+                        "16px",
+                    }}
+                  />
+
+                </div>
+
+                {/* ERROR */}
+
+                {error && (
+                  <div
+                    style={{
+                      padding:
+                        "12px 16px",
+                      borderRadius:
+                        "8px",
+                      background:
+                        "#fff1f1",
+                      color:
+                        "#b42318",
+                    }}
+                  >
+                    {error}
+                  </div>
+                )}
+
+                {/* SUCCESS */}
+
+                {message && (
+                  <div
+                    style={{
+                      padding:
+                        "12px 16px",
+                      borderRadius:
+                        "8px",
+                      background:
+                        "#f1faf4",
+                      color:
+                        "#18794e",
+                    }}
+                  >
+                    {message}
+                  </div>
+                )}
+
+                {/* SUBMIT */}
+
+                <div
+                  className="booking-next"
+                  style={{
+                    marginTop:
+                      "5px",
+                  }}
+                >
+
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={
+                      loading
+                    }
+                  >
+                    {loading
+                      ? "Sending..."
+                      : "Send Reset Link â†’"}
+                  </button>
+
+                </div>
+
+              </div>
+
+            </form>
+
+            <div
+              className="booking-summary-divider"
+              style={{
+                marginTop:
+                  "30px",
+              }}
+            />
+
+            <div
+              style={{
+                textAlign:
+                  "center",
+              }}
+            >
+
+              <Link
+                href="/account/login"
+                style={{
+                  textDecoration:
+                    "underline",
+                }}
+              >
+                Back to Login
+              </Link>
+
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+    </>
+  );
+}
+"use client";
+
+import {
+  FormEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
+import {
+  useSearchParams,
+} from "next/navigation";
+
+import Link from "next/link";
+
+import PageHero from "@/components/shared/PageHero";
+
+export default function ResetPasswordPage() {
+  const searchParams =
+    useSearchParams();
+
+  const token =
+    searchParams.get(
+      "token"
+    ) || "";
+
+  const [password, setPassword] =
+    useState("");
+
+  const [
+    confirmPassword,
+    setConfirmPassword,
+  ] = useState("");
+
+  const [
+    showPassword,
+    setShowPassword,
+  ] = useState(false);
+
+  const [
+    showConfirmPassword,
+    setShowConfirmPassword,
+  ] = useState(false);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [success, setSuccess] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  const formCardRef =
+    useRef<HTMLDivElement>(null);
+
+  /*
+   * ============================================
+   * SCROLL TO FORM
+   * ============================================
+   */
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      formCardRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, []);
+
+  /*
+   * ============================================
+   * RESET PASSWORD
+   * ============================================
+   */
+
+  const handleSubmit =
+    async (
+      event: FormEvent
+    ) => {
+      event.preventDefault();
+
+      setError("");
+
+      if (!token) {
+        setError(
+          "This password reset link is invalid."
+        );
+
+        return;
+      }
+
+      if (password.length < 8) {
+        setError(
+          "Password must be at least 8 characters."
+        );
+
+        return;
+      }
+
+      if (
+        password !==
+        confirmPassword
+      ) {
+        setError(
+          "Passwords do not match."
+        );
+
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        const response =
+          await fetch(
+            "/api/account/reset-password",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body: JSON.stringify({
+                token,
+                password,
+              }),
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+          throw new Error(
+            data.error ||
+              "Unable to reset your password."
+          );
+        }
+
+        setSuccess(true);
+
+        setPassword("");
+        setConfirmPassword("");
+      } catch (error) {
+        console.error(
+          "RESET PASSWORD ERROR:",
+          error
+        );
+
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Unable to reset your password."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+  /*
+   * ============================================
+   * SUCCESS
+   * ============================================
+   */
+
+  if (success) {
+    return (
+      <>
+        <PageHero
+          eyebrow="PASSWORD RESET"
+          title="Password Updated"
+          description="Your password has been changed successfully."
+        />
+
+        <section className="section">
+          <div className="site-container">
+
+            <div
+              className="booking-summary-card"
+              style={{
+                maxWidth:
+                  "600px",
+                margin:
+                  "0 auto",
+                textAlign:
+                  "center",
+              }}
+            >
+
+              <div className="booking-header">
+
+                <p className="eyebrow">
+                  SUCCESS
+                </p>
+
+                <h2 className="section-heading">
+                  Your password has been
+                  updated
+                </h2>
+
+                <p className="section-description">
+                  You can now sign in to
+                  your customer account
+                  using your new password.
+                </p>
+
+              </div>
+
+              <div
+                className="booking-next"
+                style={{
+                  marginTop:
+                    "30px",
+                }}
+              >
+
+                <Link
+                  href="/account/login"
+                  className="btn btn-primary"
+                >
+                  Go to Login â†’
+                </Link>
+
+              </div>
+
+            </div>
+
+          </div>
+        </section>
+      </>
+    );
+  }
+
+  /*
+   * ============================================
+   * RESET FORM
+   * ============================================
+   */
+
+  return (
+    <>
+      <PageHero
+        eyebrow="ACCOUNT RECOVERY"
+        title="Create a New Password"
+        description="Choose a new password for your customer account."
+      />
+
+      <section className="section">
+        <div className="site-container">
+
+          <div
+            ref={formCardRef}
+            className="booking-summary-card"
+            style={{
+              maxWidth:
+                "600px",
+              margin:
+                "0 auto",
+            }}
+          >
+
+            <div className="booking-header">
+
+              <p className="eyebrow">
+                RESET PASSWORD
+              </p>
+
+              <h2 className="section-heading">
+                Set your new password
+              </h2>
+
+              <p className="section-description">
+                Your new password must be
+                at least 8 characters long.
+              </p>
+
+            </div>
+
+            <div className="booking-summary-divider" />
+
+            <form
+              onSubmit={
+                handleSubmit
+              }
+            >
+
+              <div
+                style={{
+                  display:
+                    "flex",
+                  flexDirection:
+                    "column",
+                  gap: "20px",
+                }}
+              >
+
+                {/* NEW PASSWORD */}
+
+                <div>
+
+                  <label
+                    htmlFor="password"
+                    style={{
+                      display:
+                        "block",
+                      marginBottom:
+                        "8px",
+                    }}
+                  >
+                    New Password
+                  </label>
+
+                  <div
+                    style={{
+                      position:
+                        "relative",
+                    }}
+                  >
+
+                    <input
+                      id="password"
+                      type={
+                        showPassword
+                          ? "text"
+                          : "password"
+                      }
+                      value={password}
+                      onChange={(
+                        event
+                      ) =>
+                        setPassword(
+                          event.target.value
+                        )
+                      }
+                      placeholder="Enter at least 8 characters"
+                      autoComplete="new-password"
+                      required
+                      disabled={
+                        loading
+                      }
+                      style={{
+                        width:
+                          "100%",
+                        padding:
+                          "14px 50px 14px 16px",
+                        border:
+                          "1px solid #ddd",
+                        borderRadius:
+                          "8px",
+                        fontSize:
+                          "16px",
+                      }}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowPassword(
+                          (
+                            current
+                          ) =>
+                            !current
+                        )
+                      }
+                      aria-label={
+                        showPassword
+                          ? "Hide password"
+                          : "Show password"
+                      }
+                      style={{
+                        position:
+                          "absolute",
+                        right:
+                          "14px",
+                        top:
+                          "50%",
+                        transform:
+                          "translateY(-50%)",
+                        background:
+                          "transparent",
+                        border:
+                          "none",
+                        cursor:
+                          "pointer",
+                        padding:
+                          "4px",
+                        fontSize:
+                          "18px",
+                      }}
+                    >
+                      {showPassword
+                        ? "ðŸ™ˆ"
+                        : "ðŸ‘"}
+                    </button>
+
+                  </div>
+
+                </div>
+
+                {/* CONFIRM PASSWORD */}
+
+                <div>
+
+                  <label
+                    htmlFor="confirmPassword"
+                    style={{
+                      display:
+                        "block",
+                      marginBottom:
+                        "8px",
+                    }}
+                  >
+                    Confirm New Password
+                  </label>
+
+                  <div
+                    style={{
+                      position:
+                        "relative",
+                    }}
+                  >
+
+                    <input
+                      id="confirmPassword"
+                      type={
+                        showConfirmPassword
+                          ? "text"
+                          : "password"
+                      }
+                      value={
+                        confirmPassword
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        setConfirmPassword(
+                          event.target.value
+                        )
+                      }
+                      placeholder="Re-enter your new password"
+                      autoComplete="new-password"
+                      required
+                      disabled={
+                        loading
+                      }
+                      style={{
+                        width:
+                          "100%",
+                        padding:
+                          "14px 50px 14px 16px",
+                        border:
+                          "1px solid #ddd",
+                        borderRadius:
+                          "8px",
+                        fontSize:
+                          "16px",
+                      }}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowConfirmPassword(
+                          (
+                            current
+                          ) =>
+                            !current
+                        )
+                      }
+                      aria-label={
+                        showConfirmPassword
+                          ? "Hide password"
+                          : "Show password"
+                      }
+                      style={{
+                        position:
+                          "absolute",
+                        right:
+                          "14px",
+                        top:
+                          "50%",
+                        transform:
+                          "translateY(-50%)",
+                        background:
+                          "transparent",
+                        border:
+                          "none",
+                        cursor:
+                          "pointer",
+                        padding:
+                          "4px",
+                        fontSize:
+                          "18px",
+                      }}
+                    >
+                      {showConfirmPassword
+                        ? "ðŸ™ˆ"
+                        : "ðŸ‘"}
+                    </button>
+
+                  </div>
+
+                </div>
+
+                {/* ERROR */}
+
+                {error && (
+                  <div
+                    style={{
+                      padding:
+                        "12px 16px",
+                      borderRadius:
+                        "8px",
+                      background:
+                        "#fff1f1",
+                      color:
+                        "#b42318",
+                    }}
+                  >
+                    {error}
+                  </div>
+                )}
+
+                {/* SUBMIT */}
+
+                <div
+                  className="booking-next"
+                  style={{
+                    marginTop:
+                      "5px",
+                  }}
+                >
+
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={
+                      loading
+                    }
+                  >
+                    {loading
+                      ? "Updating Password..."
+                      : "Update Password â†’"}
+                  </button>
+
+                </div>
+
+              </div>
+
+            </form>
+
+            <div
+              className="booking-summary-divider"
+              style={{
+                marginTop:
+                  "30px",
+              }}
+            />
+
+            <div
+              style={{
+                textAlign:
+                  "center",
+              }}
+            >
+
+              <Link
+                href="/account/login"
+                style={{
+                  textDecoration:
+                    "underline",
+                }}
+              >
+                Back to Login
+              </Link>
+
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+    </>
+  );
+}

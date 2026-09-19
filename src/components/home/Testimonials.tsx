@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 
 type PublicFeedback = {
@@ -18,6 +18,7 @@ export default function Testimonials() {
 
   const [testimonials, setTestimonials] = useState<PublicFeedback[]>([]);
   const [loading, setLoading] = useState(true);
+  const sectionRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,15 +53,38 @@ export default function Testimonials() {
       }
     }
 
-    loadFeedback();
+    const section = sectionRef.current;
+
+    if (typeof IntersectionObserver === "undefined" || !section) {
+      void loadFeedback();
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) {
+          return;
+        }
+
+        observer.disconnect();
+        void loadFeedback();
+      },
+      { rootMargin: "600px 0px" },
+    );
+
+    observer.observe(section);
 
     return () => {
       cancelled = true;
+      observer.disconnect();
     };
   }, []);
 
   return (
-    <section className="section">
+    <section ref={sectionRef} className="section">
       <div className="site-container">
         <p className="eyebrow">{t("home.testimonials.eyebrow")}</p>
 

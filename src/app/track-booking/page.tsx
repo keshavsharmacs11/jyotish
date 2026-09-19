@@ -207,20 +207,26 @@ export default function TrackBookingPage() {
         ) {
           throw new Error(
             data.error ||
-              language === "hi" ? "सत्यापन कोड का अनुरोध नहीं किया जा सका।" : "Unable to request a verification code."
+              (language === "hi"
+                ? "सत्यापन कोड का अनुरोध नहीं किया जा सका।"
+                : "Unable to request a verification code.")
           );
         }
 
         setMessage(
           data.message ||
-            language === "hi" ? "सत्यापन कोड के लिए अपना ईमेल देखें।" : "Check your email for the verification code."
+            (language === "hi"
+              ? "सत्यापन कोड के लिए अपना ईमेल देखें।"
+              : "Check your email for the verification code.")
         );
         setStep("otp");
       } catch (error) {
         setError(
           error instanceof Error
             ? error.message
-            : language === "hi" ? "सत्यापन कोड का अनुरोध नहीं किया जा सका।" : "Unable to request a verification code."
+            : language === "hi"
+              ? "सत्यापन कोड का अनुरोध नहीं किया जा सका।"
+              : "Unable to request a verification code."
         );
       } finally {
         setLoading(false);
@@ -268,7 +274,9 @@ export default function TrackBookingPage() {
         ) {
           throw new Error(
             data.error ||
-              language === "hi" ? "बुकिंग सत्यापित नहीं की जा सकी।" : "Unable to verify the booking."
+              (language === "hi"
+                ? "बुकिंग सत्यापित नहीं की जा सकी।"
+                : "Unable to verify the booking.")
           );
         }
 
@@ -289,7 +297,9 @@ export default function TrackBookingPage() {
         ) {
           throw new Error(
             trackData.error ||
-              language === "hi" ? "बुकिंग लोड नहीं की जा सकी।" : "Unable to load the booking."
+              (language === "hi"
+                ? "बुकिंग लोड नहीं की जा सकी।"
+                : "Unable to load the booking.")
           );
         }
 
@@ -301,7 +311,9 @@ export default function TrackBookingPage() {
         setError(
           error instanceof Error
             ? error.message
-            : language === "hi" ? "बुकिंग सत्यापित नहीं की जा सकी।" : "Unable to verify the booking."
+            : language === "hi"
+              ? "बुकिंग सत्यापित नहीं की जा सकी।"
+              : "Unable to verify the booking."
         );
       } finally {
         setLoading(false);

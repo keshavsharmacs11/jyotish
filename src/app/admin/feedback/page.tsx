@@ -963,7 +963,6 @@ export default function AdminFeedbackPage() {
                   rows={4}
                   placeholder="Optional internal moderation note…"
                   disabled={Boolean(actionId)}
-                  className="admin-search-input"
                   className="admin-search-input feedback-admin-note"
                 />
               </div>

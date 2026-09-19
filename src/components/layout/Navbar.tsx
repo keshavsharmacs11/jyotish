@@ -464,11 +464,11 @@ export default function Navbar() {
           }}
         >
           <Image
-            src="/images/brand/logo-navbar.png"
+            src="/images/brand/logo-navbar.webp"
             alt="Akshaanshh Jyotish"
             width={180}
-            height={70}
-            unoptimized
+            height={65}
+            priority
             className="navbar-logo"
           />
         </Link>

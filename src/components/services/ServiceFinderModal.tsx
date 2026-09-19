@@ -165,6 +165,7 @@ export default function ServiceFinderModal({
       }}
     >
       <div
+        id="service-finder-dialog"
         className="service-finder-modal"
         role="dialog"
         aria-modal="true"

@@ -3,129 +3,218 @@ import bcrypt from "bcryptjs";
 
 import clientPromise from "@/lib/mongodb";
 import User from "@/models/User";
-import { requireAdmin } from "@/lib/adminAuth";
+import { requireSuperAdmin } from "@/lib/adminAuth";
+import { checkRateLimit } from "@/lib/rateLimit";
+import { getClientIp } from "@/lib/requestSecurity";
+import {
+  isValidEmail,
+  isStrongPassword,
+} from "@/lib/validation";
+
+const MAX_REQUEST_BODY_BYTES = 32 * 1024;
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAdmin(request);
+  const auth = await requireSuperAdmin(request);
 
   if (!auth.authorized) {
     return auth.response;
   }
 
   try {
-    const body = await request.json();
+    const ipRateLimit = await checkRateLimit({
+      key: `admin-create-ip:${getClientIp(request)}`,
+      limit: 5,
+      windowMs: 15 * 60 * 1000,
+    });
 
-    const {
-      name,
-      email,
-      password,
-      phone,
-    } = body;
-
-    if (!name || !email || !password) {
+    if (!ipRateLimit.allowed) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Name, email and password are required.",
+          error: "Too many administrator creation requests. Please try again later.",
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(ipRateLimit.retryAfterSeconds),
+          },
+        }
+      );
+    }
+
+    const contentLength = request.headers.get("content-length");
+    if (
+      contentLength &&
+      Number.isFinite(Number(contentLength)) &&
+      Number(contentLength) > MAX_REQUEST_BODY_BYTES
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Request payload is too large.",
+        },
+        { status: 413 }
+      );
+    }
+
+    const rawBody = await request.text();
+
+    if (
+      Buffer.byteLength(rawBody, "utf8") >
+      MAX_REQUEST_BODY_BYTES
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Request payload is too large.",
+        },
+        { status: 413 }
+      );
+    }
+
+    let body: unknown;
+
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid request payload.",
         },
         { status: 400 }
       );
     }
 
-    if (password.length < 12) {
+    if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body)
+    ) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Admin password must be at least 12 characters long.",
+          error: "Invalid request payload.",
         },
         { status: 400 }
       );
     }
 
-    const normalizedEmail =
-      email.trim().toLowerCase();
+    const requestBody =
+      body as Record<string, unknown>;
 
-    /*
-     * Make sure MongoDB is available.
-     */
+    const name =
+      typeof requestBody.name === "string"
+        ? requestBody.name.trim()
+        : "";
+
+    const email =
+      typeof requestBody.email === "string"
+        ? requestBody.email.trim().toLowerCase()
+        : "";
+
+    const password =
+      typeof requestBody.password === "string"
+        ? requestBody.password
+        : "";
+
+    const phone =
+      typeof requestBody.phone === "string"
+        ? requestBody.phone.trim()
+        : "";
+
+    if (
+      name.length < 2 ||
+      name.length > 100
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Please enter a valid administrator name.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!isValidEmail(email)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Please enter a valid email address.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      password.length < 12 ||
+      password.length > 128 ||
+      !isStrongPassword(password)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Administrator password must be 12–128 characters and include uppercase, lowercase, number, and special character.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (phone.length > 40) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Phone number is too long.",
+        },
+        { status: 400 }
+      );
+    }
 
     const client = await clientPromise;
+    await client.db().command({ ping: 1 });
 
-    await client
-      .db()
-      .command({ ping: 1 });
-
-    /*
-     * Check whether this email already exists.
-     */
-
-    const existingUser =
-      await User.findOne({
-        email: normalizedEmail,
-      });
+    const existingUser = await User.findOne({
+      email,
+    }).select("_id email role");
 
     if (existingUser) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "A user with this email already exists.",
+          error: "A user with this email already exists.",
         },
         { status: 409 }
       );
     }
 
-    /*
-     * NEVER store the plain-text password.
-     *
-     * bcrypt creates a secure password hash.
-     */
-
-    const passwordHash =
-      await bcrypt.hash(
-        password,
-        12
-      );
-
-    /*
-     * Create the Admin account.
-     */
-
-    const admin =
-      await User.create({
-        name: name.trim(),
-
-        email:
-          normalizedEmail,
-
-        phone:
-          phone?.trim() || "",
-
-        passwordHash,
-
-        role: "admin",
-        consultantProfileEligible: false,
-      });
-
-    console.log(
-      "Admin user created:",
-      {
-        id: admin._id,
-        email: admin.email,
-        role: admin.role,
-      }
+    const passwordHash = await bcrypt.hash(
+      password,
+      12
     );
+
+    const admin = await User.create({
+      name,
+      email,
+      phone,
+      passwordHash,
+      role: "admin",
+      consultantProfileEligible: false,
+      isSuperAdmin: false,
+      authVersion: 1,
+    });
+
+    console.log("Admin user created by Super Administrator:", {
+      id: admin._id.toString(),
+      role: admin.role,
+    });
 
     return NextResponse.json(
       {
         success: true,
-        message:
-          "Admin account created successfully.",
-
+        message: "Admin account created successfully.",
         admin: {
-          id: admin._id,
+          id: admin._id.toString(),
           name: admin.name,
           email: admin.email,
           phone: admin.phone,
@@ -135,16 +224,12 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error(
-      "ADMIN CREATION ERROR:",
-      error
-    );
+    console.error("ADMIN CREATION ERROR:", error);
 
     return NextResponse.json(
       {
         success: false,
-        error:
-          "Unable to create admin account.",
+        error: "Unable to create admin account.",
       },
       { status: 500 }
     );

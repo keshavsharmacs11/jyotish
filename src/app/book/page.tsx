@@ -1066,6 +1066,24 @@ export default function BookPage() {
             );
 
           if (active) {
+            if (authenticated) {
+              const sessionEmail =
+                typeof data?.user?.email === "string"
+                  ? data.user.email.trim()
+                  : typeof data?.email === "string"
+                  ? data.email.trim()
+                  : "";
+
+              if (sessionEmail) {
+                setCustomerData((current) => ({
+                  ...current,
+                  email:
+                    current.email.trim() ||
+                    sessionEmail,
+                }));
+              }
+            }
+
             setAccountStatus(
               authenticated
                 ? "authenticated"
@@ -2380,15 +2398,114 @@ export default function BookPage() {
 
                 /*
                  * ===================================
-                 * POST-PAYMENT SUCCESS SCREEN
+                 * POST-PAYMENT ACCOUNT CONNECTION
                  * ===================================
                  *
-                 * Stay on the booking page after successful
-                 * verification. The success screen below gives
-                 * the customer explicit next-step choices instead
-                 * of forcing an automatic redirect.
+                 * Payment has already been verified successfully.
+                 *
+                 * Logged-in customers are already connected through their
+                 * authenticated account.
+                 *
+                 * For a guest booking, check the booking email AFTER payment.
+                 * If that email already belongs to a customer account, the
+                 * server connects this paid booking to that existing userId.
+                 * No password or account session is created by this step.
+                 *
+                 * If the email does not belong to an account yet, the customer
+                 * is sent to Create Account with this paid booking attached.
                  */
-                setPaymentSuccess(true);
+                const trackingEmail =
+                  customerData.email.trim() ||
+                  bookingData.customer.email.trim();
+
+                if (
+                  accountStatus === "guest" &&
+                  trackingEmail
+                ) {
+                  try {
+                    const linkResponse =
+                      await fetch(
+                        "/api/account/link-booking-by-email",
+                        {
+                          method: "POST",
+                          headers: {
+                            "Content-Type":
+                              "application/json",
+                          },
+                          body: JSON.stringify({
+                            bookingId:
+                              databaseBooking.bookingId,
+                            email:
+                              trackingEmail,
+                          }),
+                        }
+                      );
+
+                    const linkData =
+                      await linkResponse.json().catch(
+                        () => null
+                      );
+
+                    if (
+                      !linkResponse.ok ||
+                      !linkData?.success
+                    ) {
+                      throw new Error(
+                        linkData?.error ||
+                          "Unable to connect the booking to the customer account."
+                      );
+                    }
+
+                    if (
+                      linkData.accountExists === true
+                    ) {
+                      const trackingQuery =
+                        new URLSearchParams({
+                          bookingId:
+                            databaseBooking.bookingId,
+                          email:
+                            trackingEmail,
+                        });
+
+                      window.location.href =
+                        `/track-booking?${trackingQuery.toString()}`;
+
+                      return;
+                    }
+
+                    /*
+                     * New email: the paid booking is still unlinked.
+                     * Account creation will verify the booking email and
+                     * connect the booking to the newly created user.
+                     */
+                    window.location.href =
+                      `/account/create?email=${encodeURIComponent(
+                        trackingEmail
+                      )}&bookingId=${encodeURIComponent(
+                        databaseBooking.bookingId
+                      )}`;
+
+                    return;
+                  } catch (accountLinkError) {
+                    /*
+                     * Do not block a successful payment because account
+                     * linking failed. Send the customer to Track My Booking
+                     * so the paid booking remains accessible.
+                     */
+                    console.error(
+                      "POST-PAYMENT ACCOUNT LINK ERROR:",
+                      accountLinkError
+                    );
+                  }
+                }
+
+                const trackingQuery = new URLSearchParams({
+                  bookingId: databaseBooking.bookingId,
+                  email: trackingEmail,
+                });
+
+                window.location.href =
+                  `/track-booking?${trackingQuery.toString()}`;
 
                 return;
               } catch (error) {
@@ -2864,7 +2981,7 @@ export default function BookPage() {
                   <p className="section-description">
                     {accountStatus ===
                     "authenticated"
-                      ? (isHindi ? "आप पहले से साइन इन हैं। आपका पुष्टि किया गया परामर्श मेरी बुकिंग में उपलब्ध है।" : "You are already signed in. Your confirmed consultation is available in My Bookings.")
+                      ? (isHindi ? "आप पहले से साइन इन हैं। आपकी पुष्टि की गई बुकिंग अब Track My Booking में उपलब्ध है।" : "You are already signed in. Your confirmed booking is ready in Track My Booking.")
                       : accountStatus ===
                         "guest"
                       ? (isHindi ? "इस बुकिंग को बाद में प्रबंधित करने के लिए इसी ईमेल पते से खाता बनाएं।" : "Create an account using the same email address to manage this booking later.")
@@ -2882,11 +2999,22 @@ export default function BookPage() {
                       type="button"
                       className="btn btn-primary"
                       onClick={() => {
+                        const query =
+                          new URLSearchParams({
+                            bookingId:
+                              bookingId || "",
+                            email:
+                              customerData.email.trim() ||
+                              bookingData.customer.email.trim(),
+                          });
+
                         window.location.href =
-                          "/my-bookings";
+                          `/track-booking?${query.toString()}`;
                       }}
                     >
-                      {isHindi ? "मेरी बुकिंग देखें →" : "View My Bookings →"}
+                      {isHindi
+                        ? "मेरी बुकिंग ट्रैक करें →"
+                        : "Track My Booking →"}
                     </button>
                   )}
 
@@ -2927,6 +3055,7 @@ export default function BookPage() {
                               bookingId:
                                 bookingId || "",
                               email:
+                                customerData.email.trim() ||
                                 bookingData.customer.email.trim(),
                             });
 
@@ -3634,4 +3763,4 @@ export default function BookPage() {
       </section>
     </>
   );
-}
+} 

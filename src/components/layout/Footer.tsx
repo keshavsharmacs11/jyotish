@@ -82,10 +82,11 @@ export default function Footer() {
           <div>
             <div className="footer-logo-wrapper">
               <Image
-                src="/images/brand/logo-navbar.png"
+                src="/images/brand/logo-navbar.webp"
                 alt="Akshaanshh Jyotish"
                 width={180}
-                height={70}
+                height={65}
+                loading="lazy"
                 className="footer-logo"
               />
             </div>

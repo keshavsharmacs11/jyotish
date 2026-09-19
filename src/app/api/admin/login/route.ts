@@ -1,179 +1,198 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-import clientPromise, {
+import {
   connectMongoose,
 } from "@/lib/mongodb";
 
 import User from "@/models/User";
 
-export async function POST(request: Request) {
+import {
+  checkRateLimit,
+} from "@/lib/rateLimit";
+
+import {
+  getClientIp,
+} from "@/lib/requestSecurity";
+
+const MAX_REQUEST_BODY_BYTES = 32 * 1024;
+
+function normalizeEmail(value: unknown): string {
+  return String(value || "").trim().toLowerCase();
+}
+
+export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const clientIp = getClientIp(request);
 
-    const { email, password } = body;
+    const ipLimit = await checkRateLimit({
+      key: `admin-login-ip:${clientIp}`,
+      limit: 10,
+      windowMs: 15 * 60 * 1000,
+    });
 
-    /*
-     * ============================================
-     * VALIDATE INPUT
-     * ============================================
-     */
-
-    if (!email || !password) {
+    if (!ipLimit.allowed) {
       return NextResponse.json(
         {
           success: false,
-          error: "Email and password are required.",
+          error: "Too many login attempts. Please try again later.",
         },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(ipLimit.retryAfterSeconds),
+          },
+        }
+      );
+    }
+
+    const contentLength = request.headers.get("content-length");
+    if (
+      contentLength &&
+      (!Number.isFinite(Number(contentLength)) ||
+        Number(contentLength) > MAX_REQUEST_BODY_BYTES)
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Request is too large." },
+        { status: 413 }
+      );
+    }
+
+    let body: unknown;
+    try {
+      const rawBody = await request.text();
+
+      if (
+        Buffer.byteLength(rawBody, "utf8") >
+        MAX_REQUEST_BODY_BYTES
+      ) {
+        return NextResponse.json(
+          { success: false, error: "Request is too large." },
+          { status: 413 }
+        );
+      }
+
+      body = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid request." },
         { status: 400 }
       );
     }
 
-    const normalizedEmail =
-      String(email).trim().toLowerCase();
-
-    /*
-     * ============================================
-     * JWT SECRET
-     * ============================================
-     */
-
-    const jwtSecret =
-      process.env.JWT_SECRET;
-
-    if (!jwtSecret) {
-      console.error(
-        "JWT_SECRET is not configured."
+    if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body)
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Invalid request." },
+        { status: 400 }
       );
+    }
 
+    const requestBody = body as Record<string, unknown>;
+    const normalizedEmail = normalizeEmail(requestBody.email);
+    const password =
+      typeof requestBody.password === "string"
+        ? requestBody.password
+        : "";
+
+    if (!normalizedEmail || !password) {
+      return NextResponse.json(
+        { success: false, error: "Invalid email or password." },
+        { status: 401 }
+      );
+    }
+
+    if (normalizedEmail.length > 320 || password.length > 128) {
+      return NextResponse.json(
+        { success: false, error: "Invalid email or password." },
+        { status: 401 }
+      );
+    }
+
+    const accountLimit = await checkRateLimit({
+      key: `admin-login-account:${normalizedEmail}`,
+      limit: 5,
+      windowMs: 15 * 60 * 1000,
+    });
+
+    if (!accountLimit.allowed) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Authentication is not configured.",
+          error: "Too many login attempts. Please try again later.",
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(
+              accountLimit.retryAfterSeconds
+            ),
+          },
+        }
+      );
+    }
+
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      console.error("JWT_SECRET is not configured.");
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Authentication is not configured.",
         },
         { status: 500 }
       );
     }
 
-    /*
-     * ============================================
-     * DATABASE CONNECTION
-     * ============================================
-     */
-
-    const client = await clientPromise;
-
-    await client
-      .db()
-      .command({ ping: 1 });
-
-    /*
-     * Connect Mongoose before using
-     * Mongoose models such as User.
-     */
-
     await connectMongoose();
-
-    /*
-     * ============================================
-     * FIND USER
-     * ============================================
-     */
 
     const user = await User.findOne({
       email: normalizedEmail,
     });
 
     /*
-     * Do not reveal whether the email exists.
+     * Return the same credential error for nonexistent users,
+     * non-admin users, and wrong passwords.
      */
-
-    if (!user) {
+    if (
+      !user ||
+      user.role !== "admin" ||
+      user.active === false
+    ) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Invalid email or password.",
+          error: "Invalid email or password.",
         },
         { status: 401 }
       );
     }
 
-    /*
-     * ============================================
-     * CHECK ADMIN ROLE
-     * ============================================
-     */
-
-    if (user.role !== "admin") {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "You do not have permission to access the admin panel.",
-        },
-        { status: 403 }
-      );
-    }
-
-    /*
-     * ============================================
-     * CHECK ADMIN ACCOUNT STATUS
-     * ============================================
-     *
-     * Existing administrator records created before
-     * the active field was introduced may have
-     * active === undefined. Those accounts remain
-     * active for backward compatibility.
-     */
-
-    if (user.active === false) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Your administrator access has been revoked. Please contact the Super Administrator.",
-        },
-        { status: 403 }
-      );
-    }
-
-    /*
-     * ============================================
-     * VERIFY PASSWORD
-     * ============================================
-     */
-
-    const passwordValid =
-      await bcrypt.compare(
-        password,
-        user.passwordHash
-      );
+    const passwordValid = await bcrypt.compare(
+      password,
+      user.passwordHash
+    );
 
     if (!passwordValid) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Invalid email or password.",
+          error: "Invalid email or password.",
         },
         { status: 401 }
       );
     }
-
-    /*
-     * ============================================
-     * CREATE JWT
-     * ============================================
-     */
 
     const token = jwt.sign(
       {
         userId: user._id.toString(),
         email: user.email,
         role: user.role,
+        authVersion: user.authVersion,
       },
       jwtSecret,
       {
@@ -181,66 +200,32 @@ export async function POST(request: Request) {
       }
     );
 
-    /*
-     * ============================================
-     * CREATE RESPONSE
-     * ============================================
-     */
+    const response = NextResponse.json({
+      success: true,
+      message: "Admin login successful.",
+      admin: {
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
 
-    const response =
-      NextResponse.json({
-        success: true,
-        message:
-          "Admin login successful.",
-        admin: {
-          id: user._id.toString(),
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        },
-      });
-
-    /*
-     * ============================================
-     * SECURE AUTH COOKIE
-     * ============================================
-     *
-     * httpOnly:
-     * JavaScript cannot read the token.
-     *
-     * sameSite:
-     * Helps protect against CSRF.
-     *
-     * secure:
-     * HTTPS in production.
-     */
-
-    response.cookies.set(
-      "admin_token",
-      token,
-      {
-        httpOnly: true,
-        secure:
-          process.env.NODE_ENV ===
-          "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: 60 * 60 * 24,
-      }
-    );
+    response.cookies.set("admin_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24,
+    });
 
     return response;
   } catch (error) {
-    console.error(
-      "ADMIN LOGIN ERROR:",
-      error
-    );
-
+    console.error("ADMIN LOGIN ERROR:", error);
     return NextResponse.json(
       {
         success: false,
-        error:
-          "Unable to process admin login.",
+        error: "Unable to process admin login.",
       },
       { status: 500 }
     );

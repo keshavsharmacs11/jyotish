@@ -39,7 +39,10 @@ export async function POST(request: NextRequest) {
     return auth.response;
   }
 
+  let reconciliationStep = "request";
+
   try {
+    reconciliationStep = "parse request";
     const body = await request.json();
 
     const bookingId = String(
@@ -73,6 +76,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    reconciliationStep = "connect to database";
     await connectMongoose();
 
     let payment: any = null;
@@ -138,6 +142,7 @@ export async function POST(request: NextRequest) {
      * =========================================================
      */
 
+    reconciliationStep = "query Razorpay refund";
     const authHeader = Buffer.from(
       `${keyId}:${keySecret}`
     ).toString("base64");
@@ -274,6 +279,7 @@ export async function POST(request: NextRequest) {
      * =========================================================
      */
 
+    reconciliationStep = "synchronize payment";
     payment.razorpayRefundId = refundId;
 
     if (refundStatus === "processed") {
@@ -298,6 +304,7 @@ export async function POST(request: NextRequest) {
      * =========================================================
      */
 
+    reconciliationStep = "synchronize booking";
     const booking = await Booking.findById(
       payment.bookingId
     );
@@ -336,6 +343,7 @@ export async function POST(request: NextRequest) {
      *   service accepts the message.
      */
 
+    reconciliationStep = "process refund email";
     let customerRefundEmailSent = false;
     let customerRefundEmailError: string | null = null;
 
@@ -493,9 +501,23 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Unknown refund reconciliation error.";
+
+    const errorStack =
+      error instanceof Error
+        ? error.stack
+        : undefined;
+
     console.error(
       "REFUND RECONCILIATION ERROR:",
-      error
+      {
+        step: reconciliationStep,
+        message: errorMessage,
+        stack: errorStack,
+      }
     );
 
     return NextResponse.json(
@@ -503,6 +525,10 @@ export async function POST(request: NextRequest) {
         success: false,
         error:
           "Unable to reconcile the refund status.",
+        errorCode:
+          `REFUND_RECONCILIATION_${reconciliationStep
+            .toUpperCase()
+            .replace(/[^A-Z0-9]+/g, "_")}`,
       },
       { status: 500 }
     );

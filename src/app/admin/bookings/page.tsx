@@ -2704,9 +2704,7 @@ export default function AdminBookingsPage() {
                           )}
                         </p>
 
-                     {selectedBooking.refundStatus !== "pending" &&
-  selectedBooking.refundStatus !== "processed" &&
-  selectedBooking.status !== "cancelled" &&
+                     {selectedBooking.status !== "cancelled" &&
   selectedBooking.status !== "completed" && (
     <button
       type="button"

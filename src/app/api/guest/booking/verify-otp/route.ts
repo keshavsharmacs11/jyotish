@@ -76,9 +76,7 @@ export async function POST(
 ) {
   try {
     const contentLength =
-      request.headers.get(
-        "content-length"
-      );
+      request.headers.get("content-length");
 
     if (
       contentLength &&
@@ -99,10 +97,10 @@ export async function POST(
       await request.text();
 
     if (
-      new TextEncoder().encode(
-        rawBody
-      ).byteLength >
-      MAX_REQUEST_BODY_BYTES
+      Buffer.byteLength(
+        rawBody,
+        "utf8"
+      ) > MAX_REQUEST_BODY_BYTES
     ) {
       return NextResponse.json(
         {
@@ -114,10 +112,7 @@ export async function POST(
       );
     }
 
-    let body: {
-      bookingId?: unknown;
-      otp?: unknown;
-    };
+    let body: unknown;
 
     try {
       body = JSON.parse(rawBody);
@@ -147,6 +142,24 @@ export async function POST(
       );
     }
 
+    const requestBody =
+      body as Record<
+        string,
+        unknown
+      >;
+
+    const bookingId =
+      typeof requestBody.bookingId ===
+      "string"
+        ? requestBody.bookingId.trim()
+        : "";
+
+    const otp =
+      typeof requestBody.otp ===
+      "string"
+        ? requestBody.otp.trim()
+        : "";
+
     const clientIp =
       getClientIp(request);
 
@@ -154,7 +167,8 @@ export async function POST(
       await checkRateLimit({
         key: `guest-booking-verify-ip:${clientIp}`,
         limit: 20,
-        windowMs: 15 * 60 * 1000,
+        windowMs:
+          15 * 60 * 1000,
       });
 
     if (!ipLimit.allowed) {
@@ -175,16 +189,10 @@ export async function POST(
       );
     }
 
-    const bookingId = String(
-      body.bookingId || ""
-    ).trim();
-
-    const otp = String(
-      body.otp || ""
-    ).trim();
-
     if (
-      !bookingId ||
+      !BOOKING_ID_PATTERN.test(
+        bookingId
+      ) ||
       !/^\d{6}$/.test(otp)
     ) {
       return NextResponse.json(
@@ -202,7 +210,8 @@ export async function POST(
     const booking =
       await Booking.findOne({
         bookingId,
-      });
+        userId: null,
+      }).select("_id bookingId");
 
     if (!booking) {
       return NextResponse.json(
@@ -217,8 +226,7 @@ export async function POST(
 
     const access =
       await GuestBookingAccess.findOne({
-        bookingId:
-          booking._id,
+        bookingId: booking._id,
       });
 
     if (!access) {
@@ -231,6 +239,13 @@ export async function POST(
         { status: 400 }
       );
     }
+
+    const now = new Date();
+    const candidateHash =
+      hashOtp(
+        otp,
+        booking._id.toString()
+      );
 
     if (
       access.attempts >=
@@ -247,8 +262,9 @@ export async function POST(
     }
 
     if (
+      !access.otpExpiresAt ||
       access.otpExpiresAt.getTime() <=
-      Date.now()
+        now.getTime()
     ) {
       return NextResponse.json(
         {
@@ -260,18 +276,92 @@ export async function POST(
       );
     }
 
-    const candidateHash =
-      hashOtp(
-        otp,
-        booking._id.toString()
+    /*
+     * Atomically claim the valid OTP.
+     * Only one concurrent request can match the live otpHash.
+     */
+    const accessToken =
+      crypto
+        .randomBytes(32)
+        .toString("hex");
+
+    const claimedAccess =
+      await GuestBookingAccess.findOneAndUpdate(
+        {
+          _id: access._id,
+          otpHash: candidateHash,
+          otpExpiresAt: {
+            $gt: now,
+          },
+          attempts: {
+            $lt: MAX_OTP_ATTEMPTS,
+          },
+        },
+        {
+          $set: {
+            accessTokenHash:
+              hashAccessToken(
+                accessToken
+              ),
+            accessTokenExpiresAt:
+              new Date(
+                now.getTime() +
+                  ACCESS_TTL_MS
+              ),
+            verifiedAt: now,
+            attempts: 0,
+            /* Make the old OTP impossible to reuse. */
+            otpHash:
+              crypto
+                .randomBytes(32)
+                .toString("hex"),
+            otpExpiresAt:
+              new Date(0),
+          },
+        },
+        {
+          returnDocument:
+            "after",
+        }
       );
 
-    if (
-      candidateHash !==
-      access.otpHash
-    ) {
-      access.attempts += 1;
-      await access.save();
+    if (!claimedAccess) {
+      /*
+       * Atomically increment incorrect-attempt count only when the
+       * current record still has attempts available and the OTP did
+       * not match. This prevents concurrent requests from bypassing
+       * MAX_OTP_ATTEMPTS through lost updates.
+       */
+      const attemptUpdate =
+        await GuestBookingAccess.updateOne(
+          {
+            _id: access._id,
+            otpExpiresAt: {
+              $gt: now,
+            },
+            attempts: {
+              $lt: MAX_OTP_ATTEMPTS,
+            },
+          },
+          {
+            $inc: {
+              attempts: 1,
+            },
+          }
+        );
+
+      if (
+        attemptUpdate.matchedCount === 0
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "The verification code is invalid or has expired.",
+          },
+          { status: 400 }
+        );
+      }
 
       return NextResponse.json(
         {
@@ -282,38 +372,6 @@ export async function POST(
         { status: 400 }
       );
     }
-
-    const accessToken =
-      crypto
-        .randomBytes(32)
-        .toString("hex");
-
-    access.accessTokenHash =
-      hashAccessToken(
-        accessToken
-      );
-
-    access.accessTokenExpiresAt =
-      new Date(
-        Date.now() +
-          ACCESS_TTL_MS
-      );
-
-    access.verifiedAt =
-      new Date();
-
-    access.attempts = 0;
-
-    // OTPs are strictly one-time credentials.
-    // Keep otpHash populated because the Mongoose schema requires it;
-    // replace it with a fresh random value that cannot match a 6-digit OTP.
-    access.otpHash = crypto
-      .randomBytes(32)
-      .toString("hex");
-    access.otpExpiresAt =
-      new Date(0);
-
-    await access.save();
 
     const response =
       NextResponse.json({
@@ -335,7 +393,7 @@ export async function POST(
           process.env.NODE_ENV ===
           "production",
         sameSite: "lax",
-        path: "/",
+        path: "/api/guest/booking",
         maxAge:
           Math.floor(
             ACCESS_TTL_MS /

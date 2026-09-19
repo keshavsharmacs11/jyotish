@@ -682,7 +682,7 @@ export default function DateTimeSelector({
                             aria-label={
                               isHindi
                                 ? `${formatTime(slot.startTime)}, ${serviceDuration} मिनट का अपॉइंटमेंट, जो ${formatTime(slot.endTime)} पर समाप्त होगा`
-                                : `${formatTime(slot.startTime)}, ${serviceDuration} {isHindi ? "मिनट" : "min"}ute appointment ending at ${formatTime(slot.endTime)}`
+                                : `${formatTime(slot.startTime)}, ${serviceDuration} minute${serviceDuration === 1 ? "" : "s"} appointment ending at ${formatTime(slot.endTime)}`
                             }
                           >
                             <span>

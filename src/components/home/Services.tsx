@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -104,6 +104,7 @@ export default function Services() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const sectionRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -153,15 +154,39 @@ export default function Services() {
       }
     }
 
-    loadServices();
+    const section = sectionRef.current;
+
+    if (typeof IntersectionObserver === "undefined" || !section) {
+      void loadServices();
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) {
+          return;
+        }
+
+        observer.disconnect();
+        void loadServices();
+      },
+      { rootMargin: "600px 0px" },
+    );
+
+    observer.observe(section);
 
     return () => {
       cancelled = true;
+      observer.disconnect();
     };
   }, []);
 
   return (
     <section
+      ref={sectionRef}
       className="services-section"
       id="services"
       aria-labelledby="services-title"

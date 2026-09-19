@@ -174,9 +174,9 @@ function legacyToWindows(
       continue;
     }
 
-    const times =
+    const times: string[] =
       Array.from(
-        new Set(
+        new Set<string>(
           (
             Array.isArray(
               item?.times
@@ -188,7 +188,9 @@ function legacyToWindows(
               String(time).trim()
             )
             .filter(
-              (time) =>
+              (
+                time: string
+              ): time is string =>
                 /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(
                   time
                 )
