@@ -511,8 +511,17 @@ export default function AstrologyWelcomePopup() {
           },
         );
 
-      const result =
-        (await response.json()) as ApiResponse<BirthResult>;
+      let result: ApiResponse<BirthResult>;
+
+      try {
+        result = (await response.json()) as ApiResponse<BirthResult>;
+      } catch {
+        throw new Error(
+          language === "hi"
+            ? "सर्वर से सही जवाब नहीं मिला। कृपया फिर से प्रयास करें।"
+            : "The server response was invalid. Please try again.",
+        );
+      }
 
       if (
         !response.ok ||
@@ -597,8 +606,17 @@ export default function AstrologyWelcomePopup() {
           },
         );
 
-      const result =
-        (await response.json()) as ApiResponse<RashifalResult>;
+      let result: ApiResponse<RashifalResult>;
+
+      try {
+        result = (await response.json()) as ApiResponse<RashifalResult>;
+      } catch {
+        throw new Error(
+          language === "hi"
+            ? "सर्वर से सही जवाब नहीं मिला। कृपया फिर से प्रयास करें।"
+            : "The server response was invalid. Please try again.",
+        );
+      }
 
       if (
         !response.ok ||

@@ -1,19 +1,37 @@
 import { MongoClient } from "mongodb";
 import mongoose from "mongoose";
 
-const MONGODB_URI: string =
-  (() => {
-    const uri =
-      process.env.MONGODB_URI;
+export function normalizeMongoUri(
+  rawUri: string | undefined | null,
+): string {
+  const value = rawUri?.trim();
 
-    if (!uri) {
-      throw new Error(
-        "Please define MONGODB_URI in .env.local"
-      );
-    }
+  if (!value) {
+    throw new Error(
+      "Please define MONGODB_URI in the environment."
+    );
+  }
 
-    return uri;
-  })();
+  return value;
+}
+
+export function getMongoUri(): string {
+  const rawUri =
+    process.env.MONGODB_URI ||
+    process.env.MONGODB_URI_DIRECT;
+
+  if (!rawUri?.trim()) {
+    return "";
+  }
+
+  return rawUri.trim();
+}
+
+const MONGODB_URI = getMongoUri();
+
+function isBuildPhase(): boolean {
+  return process.env.NEXT_PHASE === "phase-production-build";
+}
 
 console.log(
   "MONGODB_URI loaded:",
@@ -30,8 +48,8 @@ console.log(
 
 const options = {};
 
-let client: MongoClient;
-let clientPromise: Promise<MongoClient>;
+let client: MongoClient | null = null;
+let clientPromise: Promise<MongoClient> | null = null;
 
 declare global {
   var _mongoClientPromise:
@@ -42,38 +60,40 @@ declare global {
     | {
         conn: typeof mongoose | null;
         promise:
-          | Promise<typeof mongoose>
+          | Promise<typeof mongoose | null>
           | null;
       }
     | undefined;
 }
 
-/*
- * Prevent creating multiple MongoDB clients
- * during Next.js development hot reloads.
- */
+if (MONGODB_URI && !isBuildPhase()) {
+  /*
+   * Prevent creating multiple MongoDB clients
+   * during Next.js development hot reloads.
+   */
 
-if (process.env.NODE_ENV === "development") {
-  if (!global._mongoClientPromise) {
+  if (process.env.NODE_ENV === "development") {
+    if (!global._mongoClientPromise) {
+      client = new MongoClient(
+        MONGODB_URI,
+        options
+      );
+
+      global._mongoClientPromise =
+        client.connect();
+    }
+
+    clientPromise =
+      global._mongoClientPromise;
+  } else {
     client = new MongoClient(
       MONGODB_URI,
       options
     );
 
-    global._mongoClientPromise =
+    clientPromise =
       client.connect();
   }
-
-  clientPromise =
-    global._mongoClientPromise;
-} else {
-  client = new MongoClient(
-    MONGODB_URI,
-    options
-  );
-
-  clientPromise =
-    client.connect();
 }
 
 /*
@@ -109,24 +129,68 @@ if (process.env.NODE_ENV === "development") {
 }
 
 export async function connectMongoose() {
+  if (isBuildPhase()) {
+    console.warn(
+      "MongoDB connection skipped during Next.js build/static generation.",
+    );
+    return null;
+  }
+
+  if (!MONGODB_URI) {
+    console.warn(
+      "MongoDB is not configured; skipping Mongoose connection."
+    );
+    return null;
+  }
+
   if (mongooseCache.conn) {
     return mongooseCache.conn;
   }
 
   if (!mongooseCache.promise) {
     mongooseCache.promise =
-      mongoose.connect(MONGODB_URI);
+      mongoose.connect(MONGODB_URI).catch((error) => {
+        console.error(
+          "MongoDB connection failed; database features will remain unavailable.",
+          error
+        );
+        mongooseCache.promise = null;
+        return null;
+      });
   }
 
-  try {
-    mongooseCache.conn =
-      await mongooseCache.promise;
-  } catch (error) {
-    mongooseCache.promise = null;
-    throw error;
-  }
+  const connection =
+    await mongooseCache.promise;
+
+  mongooseCache.conn =
+    connection ?? null;
 
   return mongooseCache.conn;
 }
 
-export default clientPromise;
+export function getClientPromise(): Promise<MongoClient> {
+  if (!MONGODB_URI) {
+    return Promise.reject(
+      new Error(
+        "MongoDB is not configured. Please define MONGODB_URI in the environment.",
+      ),
+    );
+  }
+
+  if (isBuildPhase()) {
+    return Promise.reject(
+      new Error(
+        "MongoDB client creation is skipped during Next.js build/static generation.",
+      ),
+    );
+  }
+
+  if (!clientPromise) {
+    client = new MongoClient(MONGODB_URI, options);
+    clientPromise = client.connect();
+  }
+
+  return clientPromise;
+}
+
+export default getClientPromise;

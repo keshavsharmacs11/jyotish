@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
-import clientPromise from "@/lib/mongodb";
+import getClientPromise from "@/lib/mongodb";
 import User from "@/models/User";
 import { requireSuperAdmin } from "@/lib/adminAuth";
 import { checkRateLimit } from "@/lib/rateLimit";
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = await clientPromise;
+    const client = await getClientPromise();
     await client.db().command({ ping: 1 });
 
     const existingUser = await User.findOne({

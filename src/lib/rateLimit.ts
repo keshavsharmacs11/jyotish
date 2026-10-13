@@ -21,7 +21,16 @@ export async function checkRateLimit({
   limit,
   windowMs,
 }: RateLimitOptions): Promise<RateLimitResult> {
-  await connectMongoose();
+  try {
+    await connectMongoose();
+  } catch (error) {
+    console.warn("Rate limit database unavailable; allowing request temporarily.", error);
+    return {
+      allowed: true,
+      remaining: limit,
+      retryAfterSeconds: 1,
+    };
+  }
 
   const now = new Date();
 

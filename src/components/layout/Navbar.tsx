@@ -95,8 +95,30 @@ export default function Navbar() {
           }
         );
 
-      const data =
-        await response.json();
+      const rawText = await response.text();
+
+      let data: { success?: boolean; authenticated?: boolean } | null = null;
+
+      if (rawText) {
+        try {
+          data = JSON.parse(rawText) as {
+            success?: boolean;
+            authenticated?: boolean;
+          };
+        } catch {
+          console.error(
+            "NAVBAR SESSION JSON PARSE ERROR:",
+            rawText
+          );
+          setAuthenticated(false);
+          return;
+        }
+      }
+
+      if (!data) {
+        setAuthenticated(false);
+        return;
+      }
 
       if (
         response.ok &&
@@ -156,8 +178,32 @@ export default function Navbar() {
           }
         );
 
-      const data =
-        await response.json();
+      const rawText = await response.text();
+
+      let data: { success?: boolean; error?: string } | null = null;
+
+      if (rawText) {
+        try {
+          data = JSON.parse(rawText) as {
+            success?: boolean;
+            error?: string;
+          };
+        } catch {
+          console.error(
+            "CUSTOMER LOGOUT JSON PARSE ERROR:",
+            rawText
+          );
+          throw new Error(
+            "Unable to log out."
+          );
+        }
+      }
+
+      if (!data) {
+        throw new Error(
+          "Unable to log out."
+        );
+      }
 
       if (
         !response.ok ||

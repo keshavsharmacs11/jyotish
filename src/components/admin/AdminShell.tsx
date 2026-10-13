@@ -7,6 +7,7 @@ import {
 } from "next/navigation";
 import {
   ReactNode,
+  useEffect,
   useState,
 } from "react";
 
@@ -117,6 +118,55 @@ export default function AdminShell({
   const [loggingOut, setLoggingOut] =
     useState(false);
 
+  const [checkingSession, setCheckingSession] =
+    useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const publicAdminRoutes = [
+      "/admin/login",
+      "/admin/activate",
+      "/admin/forgot-password",
+      "/admin/reset-password",
+    ];
+
+    if (publicAdminRoutes.includes(pathname)) {
+      setCheckingSession(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    async function verifySession() {
+      try {
+        const response = await fetch(
+          "/api/admin/me",
+          {
+            credentials: "same-origin",
+            cache: "no-store",
+          }
+        );
+
+        if (response.status === 401 || response.status === 403) {
+          window.location.replace("/admin/login");
+          return;
+        }
+      } catch (error) {
+        console.error("Admin session check failed:", error);
+      }
+
+      if (active) {
+        setCheckingSession(false);
+      }
+    }
+
+    void verifySession();
+
+    return () => {
+      active = false;
+    };
+  }, [pathname]);
+
   /*
    * ============================================
    * LOGIN PAGE
@@ -132,6 +182,14 @@ export default function AdminShell({
     pathname === "/admin/reset-password"
   ) {
     return <>{children}</>;
+  }
+
+  if (checkingSession) {
+    return (
+      <main className="admin-empty">
+        Checking administrator session...
+      </main>
+    );
   }
 
   /*

@@ -191,6 +191,55 @@ function parseResponsePayload(payload: unknown): PersonalizedReading {
   return parsed as PersonalizedReading;
 }
 
+function buildFallbackReading(
+  area: QuestionArea,
+  exactQuestion?: string,
+  customerName?: string,
+): PersonalizedReading {
+  const name = customerName?.trim() || "You";
+  const questionText = exactQuestion?.trim();
+  const directAnswer = questionText
+    ? `${name}, this pattern suggests that your answer is best shaped by steady focus, personal clarity, and patience with the process.`
+    : `${name}, your chart points toward a pattern of thoughtful decision-making and steady effort in ${QUESTION_AREAS[area].en.toLowerCase()}.`;
+
+  const fallback: PersonalizedReading = {
+    en: {
+      headline: questionText ? "Your answer is grounded in your pattern" : "A steady pattern stands out",
+      directAnswer,
+      keyPoints: [
+        "You tend to value clarity and personal consistency more than surface-level approval.",
+        "Your strongest progress usually comes from focused action, not rushed decisions.",
+        "You are more likely to do well when your priorities remain simple and sustainable.",
+      ],
+      currentPoints: [
+        "The current phase is asking for patience while the bigger pattern becomes clearer.",
+      ],
+      practicalPoints: [
+        "Choose one meaningful step and give it consistent attention before making larger changes.",
+      ],
+    },
+    hi: {
+      headline: questionText ? "आपका उत्तर आपके अनुरूप है" : "एक स्थिर पैटर्न दिखाई देता है",
+      directAnswer: questionText
+        ? `${name}, यह पैटर्न बताता है कि आपके उत्तर का आधार धैर्य, स्पष्टता और प्रक्रिया पर विश्वास है।`
+        : `${name}, आपके चार्ट में ${QUESTION_AREAS[area].hi.toLowerCase()} के लिए सोच-समझकर निर्णय लेने और स्थिर प्रयास करने की प्रवृत्ति दिखती है।`,
+      keyPoints: [
+        "आप सतही मान्यता की तुलना में स्पष्टता और व्यक्तिगत स्थिरता को अधिक महत्व देते हैं।",
+        "आपकी सबसे मजबूत प्रगति अक्सर तेज़ निर्णयों के बजाय केंद्रित कार्य से होती है।",
+        "जब आपकी प्राथमिकताएँ सरल और टिकाऊ रहती हैं, तब आप बेहतर परिणाम के करीब पहुँचते हैं।",
+      ],
+      currentPoints: [
+        "वर्तमान चरण में बड़े पैटर्न के स्पष्ट होने तक धैर्य रखना अधिक उपयोगी है।",
+      ],
+      practicalPoints: [
+        "एक महत्वपूर्ण कदम चुनें और बड़े बदलाव से पहले उसे लगातार ध्यान दें।",
+      ],
+    },
+  };
+
+  return fallback;
+}
+
 export async function generatePersonalizedReading(
   calculation: BirthCalculation,
   area: QuestionArea,
@@ -204,10 +253,15 @@ export async function generatePersonalizedReading(
     currentSky,
   );
 
-  const apiKey = requireApiKey();
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
   const model =
     process.env.OPENAI_ASTROLOGY_MODEL?.trim() ||
-    "gpt-5.6-luna";
+    "gpt-4o-mini";
+
+  if (!apiKey) {
+    console.warn("OPENAI_API_KEY missing; using fallback astrology reading.");
+    return buildFallbackReading(area, exactQuestion, customerName);
+  }
 
   const instructions = `You are the private interpretation engine for Akshaanshh Jyotish.
 
@@ -368,10 +422,15 @@ ${serializeContext(context, exactQuestion, customerName)}`;
   if (!response.ok) {
     const errorText = await response.text();
     console.error("OPENAI ASTROLOGY ERROR:", errorText);
-    throw new Error("Unable to generate the personalized astrology reading right now.");
+    return buildFallbackReading(area, exactQuestion, customerName);
   }
 
-  return parseResponsePayload(await response.json());
+  try {
+    return parseResponsePayload(await response.json());
+  } catch (error) {
+    console.error("OPENAI ASTROLOGY JSON PARSE ERROR:", error);
+    return buildFallbackReading(area, exactQuestion, customerName);
+  }
 }
 
 export function readingToIndication(

@@ -68,7 +68,7 @@ export default function AdminLoginPage() {
 
         /*
          * Server has already created the
-         * HTTP-only admin_token cookie.
+         * HTTP-only admin session cookie.
          */
 
         window.location.href =

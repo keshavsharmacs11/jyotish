@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import getClientPromise from "@/lib/mongodb";
 
 import User from "@/models/User";
 import Service from "@/models/Service";
@@ -20,7 +20,7 @@ export async function GET() {
   }
 
   try {
-    const client = await clientPromise;
+    const client = await getClientPromise();
 
     await client
       .db("codepunkdb")

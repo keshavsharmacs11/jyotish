@@ -1,8 +1,20 @@
 import { Resend } from "resend";
 
-const resend = new Resend(
-  process.env.RESEND_API_KEY
-);
+let resend: Resend | null = null;
+
+function getResend(): Resend {
+  if (!resend) {
+    const apiKey = process.env.RESEND_API_KEY;
+
+    if (!apiKey) {
+      throw new Error("RESEND_API_KEY is not configured.");
+    }
+
+    resend = new Resend(apiKey);
+  }
+
+  return resend;
+}
 
 function getFromEmail(): string {
   const from =
@@ -46,7 +58,7 @@ export async function sendPasswordResetEmail({
   resetUrl: string;
 }) {
   const { data, error } =
-    await resend.emails.send({
+    await getResend().emails.send({
       from: getFromEmail(),
 
       to: [email],
@@ -237,7 +249,7 @@ export async function sendGuestBookingOtpEmail({
   expiresInMinutes: number;
 }) {
   const { data, error } =
-    await resend.emails.send({
+    await getResend().emails.send({
       from: getFromEmail(),
 
       to: [email],
@@ -435,7 +447,7 @@ export async function sendBookingConfirmationEmail({
     `${appUrl}/track-booking`;
 
   const { data, error } =
-    await resend.emails.send({
+    await getResend().emails.send({
       from: getFromEmail(),
 
       to: [email],
@@ -747,7 +759,7 @@ export async function sendAdminBookingNotificationEmail({
     `${appUrl}/admin`;
 
   const { data, error } =
-    await resend.emails.send({
+    await getResend().emails.send({
       from: getFromEmail(),
 
       to: [adminEmail],
@@ -1032,7 +1044,7 @@ export async function sendCustomerRefundEmail({
     `${appUrl}/track-booking`;
 
   const { data, error } =
-    await resend.emails.send({
+    await getResend().emails.send({
       from: getFromEmail(),
 
       to: [email],
@@ -1395,7 +1407,7 @@ export async function sendConsultantInvitationEmail({
 
   const safeInviteUrl = escapeHtml(normalizedInviteUrl);
 
-  const { data, error } = await resend.emails.send({
+  const { data, error } = await getResend().emails.send({
     from: getFromEmail(),
     to: [email],
     subject: "Complete your Akshaanshh Jyotish consultant profile",
@@ -1558,7 +1570,7 @@ export async function sendAdminInvitationEmail({
   );
 
   const { data, error } =
-    await resend.emails.send({
+    await getResend().emails.send({
       from: getFromEmail(),
       to: [email],
       subject:
@@ -1759,7 +1771,7 @@ export async function sendContactQueryNotificationEmail({
 
   const queryUrl = `${appUrl}/admin/queries/${encodeURIComponent(queryId)}`;
 
-  const { data, error } = await resend.emails.send({
+  const { data, error } = await getResend().emails.send({
     from: getFromEmail(),
     to: [getAdminEmail()],
     subject: `New contact query — ${queryId}`,
@@ -1835,7 +1847,7 @@ export async function sendContactQueryReceiptEmail({
   email: string;
   subject: string;
 }) {
-  const { data, error } = await resend.emails.send({
+  const { data, error } = await getResend().emails.send({
     from: getFromEmail(),
     to: [email],
     subject: `We received your query — ${queryId}`,
@@ -1907,7 +1919,7 @@ export async function sendFeedbackNotificationEmail({
 
   const feedbackUrl = `${appUrl}/admin/feedback/${encodeURIComponent(feedbackId)}`;
 
-  const { data, error } = await resend.emails.send({
+  const { data, error } = await getResend().emails.send({
     from: getFromEmail(),
     to: [getAdminEmail()],
     subject: `New feedback received — ${feedbackId}`,
@@ -1970,7 +1982,7 @@ export async function sendFeedbackReceiptEmail({
   name: string;
   email: string;
 }) {
-  const { data, error } = await resend.emails.send({
+  const { data, error } = await getResend().emails.send({
     from: getFromEmail(),
     to: [email],
     subject: `Thank you for your feedback — ${feedbackId}`,
@@ -2026,7 +2038,7 @@ export async function sendContactQueryReplyEmail({
   subject: string;
   replyMessage: string;
 }) {
-  const { data, error } = await resend.emails.send({
+  const { data, error } = await getResend().emails.send({
     from: getFromEmail(),
     to: [email],
     subject: `Re: ${subject} — ${queryId}`,
