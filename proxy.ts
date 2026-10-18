@@ -4,6 +4,7 @@ import {
 } from "next/server";
 
 import jwt from "jsonwebtoken";
+import { ADMIN_SESSION_COOKIE_NAME } from "@/lib/adminSession";
 
 export function proxy(
   request: NextRequest
@@ -29,7 +30,7 @@ export function proxy(
 
     const token =
       request.cookies.get(
-        "admin_token"
+        ADMIN_SESSION_COOKIE_NAME
       )?.value;
 
     /*

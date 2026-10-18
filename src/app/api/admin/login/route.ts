@@ -7,6 +7,7 @@ import {
 } from "@/lib/mongodb";
 
 import User from "@/models/User";
+import { ADMIN_SESSION_COOKIE_NAME } from "@/lib/adminSession";
 
 import {
   checkRateLimit,
@@ -211,7 +212,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    response.cookies.set("admin_token", token, {
+    response.cookies.set(ADMIN_SESSION_COOKIE_NAME, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",

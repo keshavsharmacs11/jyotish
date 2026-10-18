@@ -23,10 +23,6 @@ export default function Footer() {
             href: "/services",
           },
           {
-            label: "शॉप",
-            href: "/shop",
-          },
-          {
             label: "संपर्क करें",
             href: "/contact",
           },
@@ -43,10 +39,6 @@ export default function Footer() {
           {
             label: "Services",
             href: "/services",
-          },
-          {
-            label: "Shop",
-            href: "/shop",
           },
           {
             label: "Contact",

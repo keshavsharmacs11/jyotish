@@ -5,11 +5,11 @@ import {
 import crypto from "crypto";
 import mongoose from "mongoose";
 
-import clientPromise from "@/lib/mongodb";
+import getClientPromise from "@/lib/mongodb";
 
 import Booking from "@/models/Booking";
 import Service from "@/models/Service";
-import Consultant from "@/models/Consultant";
+import Consultant, { type IConsultant } from "@/models/Consultant";
 import SlotHold from "@/models/SlotHold";
 import { getCustomerId } from "@/lib/customerAuth";
 import { checkRateLimit } from "@/lib/rateLimit";
@@ -165,39 +165,20 @@ function overlaps(
 }
 
 function legacyAvailabilityToWindows(
-  availability: any[]
+  availability: IConsultant["availability"]
 ) {
-  return (
-    Array.isArray(
-      availability
-    )
-      ? availability
-      : []
-  ).flatMap((item: any) =>
-    (
-      Array.isArray(
-        item?.times
+  return availability.flatMap((item) =>
+    item.times
+      .map((time) => time.trim())
+      .filter((time) =>
+        /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)
       )
-        ? item.times
-        : []
-    )
-      .map((time: unknown) =>
-        String(time).trim()
-      )
-      .filter(
-        (time: string) =>
-          /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(
-            time
-          )
-      )
-      .map((time: string) => {
+      .map((time) => {
         const start =
           toMinutes(time);
 
         return {
-          date: String(
-            item.date
-          ),
+          date: item.date,
           startTime: time,
           endTime:
             start === null
@@ -493,7 +474,7 @@ export async function POST(
      * ============================================
      */
 
-    const client = await clientPromise;
+    const client = await getClientPromise();
 
     const db = client.db();
 
@@ -688,26 +669,15 @@ export async function POST(
       duration;
 
     const windows =
-      Array.isArray(
-        (consultant as any)
-          .availabilityWindows
-      ) &&
-      (
-        consultant as any
-      ).availabilityWindows
-        .length > 0
-        ? (
-            consultant as any
-          ).availabilityWindows
+      consultant.availabilityWindows.length > 0
+        ? consultant.availabilityWindows
         : legacyAvailabilityToWindows(
-            (consultant as any)
-              .availability ??
-              []
+            consultant.availability
           );
 
     const matchingWindow =
       windows.find(
-        (window: any) => {
+        (window) => {
           if (
             String(
               window.date
@@ -807,7 +777,7 @@ export async function POST(
 
     const blockedBookingIds =
       activeHolds.map(
-        (hold: any) =>
+        (hold) =>
           String(
             hold.bookingId
           )
@@ -833,7 +803,7 @@ export async function POST(
         string
       >(
         holdBookings.map(
-          (booking: any) => [
+          (booking) => [
             String(
               booking.bookingId
             ),
@@ -930,7 +900,7 @@ export async function POST(
         number
       >(
         holdServiceDocs.map(
-          (serviceDoc: any) => [
+          (serviceDoc) => [
             String(
               serviceDoc.serviceId
             ),

@@ -299,13 +299,23 @@ export async function POST(
     const clientIp =
       getClientIp(request);
 
-    const rateLimit =
-      await checkRateLimit({
-        key:
-          `astrology-indication:${clientIp}`,
-              limit: 20,
-              windowMs: 15 * 60 * 1000,
-      });
+    let rateLimit = {
+      allowed: true,
+      remaining: 20,
+      retryAfterSeconds: 1,
+    };
+
+    try {
+      rateLimit =
+        await checkRateLimit({
+          key:
+            `astrology-indication:${clientIp}`,
+                limit: 20,
+                windowMs: 15 * 60 * 1000,
+        });
+    } catch (error) {
+      console.warn("Rate limit check failed; falling back to allow request.", error);
+    }
 
     if (!rateLimit.allowed) {
       return NextResponse.json(

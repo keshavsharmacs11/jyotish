@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 
 import { connectMongoose } from "@/lib/mongodb";
 import User from "@/models/User";
+import { ADMIN_SESSION_COOKIE_NAME } from "@/lib/adminSession";
 
 export interface AdminTokenPayload {
   userId: string;
@@ -40,7 +41,7 @@ export async function requireAdmin(
       };
     }
 
-    const token = request.cookies.get("admin_token")?.value;
+    const token = request.cookies.get(ADMIN_SESSION_COOKIE_NAME)?.value;
 
     if (!token) {
       return {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ADMIN_SESSION_COOKIE_NAME } from "@/lib/adminSession";
 
 export async function POST() {
   try {
@@ -10,7 +11,7 @@ export async function POST() {
     /*
      * Clear the admin authentication cookie.
      */
-    response.cookies.set("admin_token", "", {
+    response.cookies.set(ADMIN_SESSION_COOKIE_NAME, "", {
       httpOnly: true,
 
       secure:
