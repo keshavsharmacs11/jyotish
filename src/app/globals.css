@@ -70292,3 +70292,217 @@ transition: none !important;
     transform: none;
   }
 }
+
+/* =========================================================
+   AKSHAANSHH JYOTISH — NAVBAR LANGUAGE + MOBILE MENU FIX
+   Append this block to the END of src/app/globals.css.
+   Do not replace the existing global stylesheet with this file.
+   ========================================================= */
+
+/* Desktop language switcher: inactive language stays readable. */
+.navbar-language-option {
+  color: rgba(255, 255, 255, 0.94) !important;
+}
+
+.navbar-language-option.is-active {
+  color: var(--color-gold-light, #e7c36c) !important;
+}
+
+.navbar-language-option:hover {
+  color: #f2d78e !important;
+}
+
+.navbar-language > span {
+  color: rgba(255, 255, 255, 0.58) !important;
+}
+
+/* Tablet and phone navigation. */
+@media screen and (max-width: 900px) {
+  .navbar-menu-open {
+    background: rgba(7, 24, 42, 0.98) !important;
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+  }
+
+  .navbar-menu-open .navbar-mobile-menu {
+    display: block !important;
+    position: fixed !important;
+    top: 76px !important;
+    right: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    z-index: 100000 !important;
+    max-height: calc(100dvh - 76px) !important;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: linear-gradient(180deg, #07182a 0%, #0d2238 100%) !important;
+    color: #ffffff !important;
+    border-top: 1px solid rgba(231, 195, 108, 0.28) !important;
+    border-bottom: 1px solid rgba(231, 195, 108, 0.36) !important;
+    box-shadow: 0 24px 45px rgba(0, 0, 0, 0.38) !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .navbar-mobile-links {
+    width: 100%;
+    padding: 8px 18px 20px !important;
+    color: #ffffff !important;
+  }
+
+  .navbar-mobile-links > a {
+    color: rgba(255, 255, 255, 0.96) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.12) !important;
+    background: transparent;
+  }
+
+  .navbar-mobile-links > a:hover,
+  .navbar-mobile-links > a:focus-visible {
+    color: #f2d78e !important;
+    background: rgba(231, 195, 108, 0.08) !important;
+  }
+
+  .navbar-mobile-links > a.is-active {
+    color: #f2d78e !important;
+    background: linear-gradient(
+      90deg,
+      rgba(231, 195, 108, 0.17),
+      rgba(231, 195, 108, 0.045)
+    ) !important;
+    border-bottom-color: rgba(231, 195, 108, 0.38) !important;
+  }
+
+  /* The language row lives inside the dark mobile menu. */
+  .navbar-mobile-language {
+    border-bottom-color: rgba(255, 255, 255, 0.16) !important;
+  }
+
+  .navbar-mobile-language > span {
+    color: rgba(255, 255, 255, 0.9) !important;
+  }
+
+  .navbar-mobile-language .navbar-language-option {
+    color: rgba(255, 255, 255, 0.96) !important;
+    font-size: 0.88rem;
+    font-weight: 700;
+  }
+
+  .navbar-mobile-language .navbar-language-option.is-active {
+    color: #f2d78e !important;
+  }
+
+  .navbar-mobile-language .navbar-language > span {
+    color: rgba(255, 255, 255, 0.58) !important;
+  }
+
+  /* Keep the booking action distinct and readable. */
+  .navbar-mobile-links > .navbar-mobile-book {
+    background: linear-gradient(135deg, #e7c36c, #d6a63b) !important;
+    color: #07182a !important;
+    border-color: rgba(231, 195, 108, 0.78) !important;
+    font-weight: 800;
+  }
+
+  .navbar-mobile-links > .navbar-mobile-book span {
+    color: #07182a !important;
+  }
+}
+
+/* Match the menu's top edge to the shorter header on small phones. */
+@media screen and (max-width: 520px) {
+  .navbar-menu-open .navbar-mobile-menu {
+    top: 68px !important;
+    max-height: calc(100dvh - 68px) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navbar-mobile-menu {
+    animation: none !important;
+  }
+}
+/* =========================================================
+   AKSHAANSHH JYOTISH — PREMIUM NAVY & GOLD MOBILE MENU
+   ========================================================= */
+
+@media (max-width: 900px) {
+  /* Dark navy drawer */
+  .navbar-mobile-menu {
+    background: linear-gradient(
+      180deg,
+      #061525 0%,
+      #0b2035 100%
+    ) !important;
+    color: #ffffff !important;
+    border-color: rgba(214, 174, 74, 0.25) !important;
+  }
+
+  /* Language row */
+  .navbar-mobile-language {
+    background: #061525 !important;
+    border-bottom: 1px solid rgba(214, 174, 74, 0.22) !important;
+  }
+
+  .navbar-mobile-language > span {
+    color: #e7c36c !important;
+    opacity: 1 !important;
+  }
+
+  .navbar-mobile-language .navbar-language-option {
+    color: #ffffff !important;
+    opacity: 1 !important;
+  }
+
+  .navbar-mobile-language
+    .navbar-language-option.is-active {
+    color: #e7c36c !important;
+    font-weight: 700 !important;
+  }
+
+  /* Navigation links */
+  .navbar-mobile-links > a:not(.navbar-mobile-book) {
+    color: #f7f7f7 !important;
+    background: transparent !important;
+    border-bottom-color: rgba(255, 255, 255, 0.09) !important;
+  }
+
+  .navbar-mobile-links > a.is-active,
+  .navbar-mobile-links > a:hover {
+    color: #e7c36c !important;
+    background: rgba(214, 174, 74, 0.10) !important;
+  }
+
+  /* Gold booking button */
+  .navbar-mobile-links > a.navbar-mobile-book {
+    color: #07182a !important;
+    background: linear-gradient(
+      135deg,
+      #f0d17b 0%,
+      #d6ae4a 100%
+    ) !important;
+    border: none !important;
+  }
+}
+
+/* Refined Account button chevron */
+.navbar .navbar-account-trigger {
+  gap: 14px;
+}
+
+.navbar .navbar-account-trigger > span {
+  color: #e6bd60;
+  font-size: 0;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 180ms ease;
+}
+
+.navbar .navbar-account-trigger[aria-expanded="true"] > span {
+  transform: translateY(2px) rotate(225deg);
+}
+
+.navbar .navbar-mobile-account {
+  gap: 10px;
+}

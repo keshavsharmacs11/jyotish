@@ -28,6 +28,8 @@ type Mode =
   | "rashifal"
   | "rashifal-result";
 
+type BirthStep = 1 | 2 | 3;
+
 type QuestionPath = {
   area: { en: string; hi: string };
   primaryHouse: number;
@@ -227,6 +229,9 @@ export default function AstrologyWelcomePopup() {
   const [mode, setMode] =
     useState<Mode>("menu");
 
+  const [birthStep, setBirthStep] =
+    useState<BirthStep>(1);
+
   const [selectedRashi, setSelectedRashi] =
     useState<number | null>(null);
 
@@ -382,6 +387,7 @@ export default function AstrologyWelcomePopup() {
   const resetState =
     useCallback(() => {
       setMode("menu");
+      setBirthStep(1);
 
       setSelectedRashi(null);
 
@@ -412,6 +418,7 @@ export default function AstrologyWelcomePopup() {
     setRashifalResult(null);
 
     if (nextMode === "birth") {
+      setBirthStep(1);
       setMode("birth");
     } else {
       setMode("rashifal");
@@ -433,83 +440,85 @@ export default function AstrologyWelcomePopup() {
 
     setError("");
 
-    if (!name.trim()) {
-      setError(
-        language === "hi"
-          ? "कृपया अपना नाम दर्ज करें।"
-          : "Please enter your name.",
-      );
+    // Step 1: validate birth details before moving to the question step.
+    if (birthStep === 1) {
+      if (!name.trim()) {
+        setError(
+          language === "hi"
+            ? "कृपया अपना नाम दर्ज करें।"
+            : "Please enter your name.",
+        );
+        return;
+      }
 
+      if (!birthDate) {
+        setError(
+          language === "hi"
+            ? "कृपया जन्म तिथि चुनें।"
+            : "Please select your birth date.",
+        );
+        return;
+      }
+
+      if (!birthState.trim()) {
+        setError(
+          language === "hi"
+            ? "कृपया जन्म का राज्य दर्ज करें।"
+            : "Please select your birth state.",
+        );
+        return;
+      }
+
+      if (!birthCity.trim()) {
+        setError(
+          language === "hi"
+            ? "कृपया जन्म का नगर दर्ज करें।"
+            : "Please select your birth city.",
+        );
+        return;
+      }
+
+      setBirthStep(2);
       return;
     }
 
-    if (!birthDate) {
-      setError(
-        language === "hi"
-          ? "कृपया जन्म तिथि चुनें।"
-          : "Please select your birth date.",
-      );
-
+    // Step 2: the question is optional; continue to a review of the details.
+    if (birthStep === 2) {
+      setBirthStep(3);
       return;
     }
 
-    if (!birthCity.trim()) {
+    // Step 3: submit the validated details to the existing API.
+    if (!name.trim() || !birthDate || !birthCity.trim() || !birthState.trim()) {
+      setBirthStep(1);
       setError(
         language === "hi"
-          ? "कृपया जन्म का नगर दर्ज करें।"
-          : "Please enter your birth city.",
+          ? "कृपया अपनी जन्म जानकारी जाँचें।"
+          : "Please review your birth details.",
       );
-
       return;
     }
 
-    if (!birthState.trim()) {
-      setError(
-        language === "hi"
-          ? "कृपया जन्म का राज्य दर्ज करें।"
-          : "Please enter your birth state.",
-      );
-
-      return;
-    }
-
-    // Keep the existing API architecture.
-    // The API still receives one birthPlace string,
-    // but now it is built from separately validated
-    // City + State fields for better geocoding.
-    const birthPlace =
-      `${birthCity.trim()}, ${birthState.trim()}`;
+    // Keep the existing API architecture and its single birthPlace value.
+    const birthPlace = `${birthCity.trim()}, ${birthState.trim()}`;
 
     setLoading(true);
 
     try {
-      const response =
-        await fetch(
-          "/api/astrology/indication",
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body: JSON.stringify({
-              name: name.trim(),
-              birthDate,
-
-              birthTime:
-                birthTime || undefined,
-
-              birthPlace,
-
-              questionArea,
-
-              exactQuestion:
-                exactQuestion.trim() || undefined,
-            }),
-          },
-        );
+      const response = await fetch("/api/astrology/indication", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          birthDate,
+          birthTime: birthTime || undefined,
+          birthPlace,
+          questionArea,
+          exactQuestion: exactQuestion.trim() || undefined,
+        }),
+      });
 
       let result: ApiResponse<BirthResult>;
 
@@ -523,11 +532,7 @@ export default function AstrologyWelcomePopup() {
         );
       }
 
-      if (
-        !response.ok ||
-        !result.ok ||
-        !result.data
-      ) {
+      if (!response.ok || !result.ok || !result.data) {
         throw new Error(
           result.error ||
             (language === "hi"
@@ -536,13 +541,9 @@ export default function AstrologyWelcomePopup() {
         );
       }
 
-      setBirthResult(
-        result.data,
-      );
-
-      setMode(
-        "birth-result",
-      );
+      setBirthResult(result.data);
+      setMode("birth-result");
+      setBirthStep(3);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -703,13 +704,16 @@ export default function AstrologyWelcomePopup() {
     birthResult?.exactQuestion?.trim() ||
     exactQuestion.trim();
 
+  const guidedMode = mode === "birth" || mode === "birth-result";
+  const activeBirthStep: BirthStep = mode === "birth-result" ? 3 : birthStep;
+
   // ---------------------------------------------------------
   // Render
   // ---------------------------------------------------------
 
   return (
     <div
-      className="astrology-welcome-overlay"
+      className={`astrology-welcome-overlay ${guidedMode ? "astrology-welcome-overlay--guided" : ""}`}
       role="presentation"
       onMouseDown={(event) => {
         if (
@@ -721,7 +725,7 @@ export default function AstrologyWelcomePopup() {
       }}
     >
       <section
-        className="astrology-welcome-modal"
+        className={`astrology-welcome-modal ${guidedMode ? "astrology-welcome-modal--guided" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label={
@@ -730,9 +734,77 @@ export default function AstrologyWelcomePopup() {
             : "Astrology welcome"
         }
       >
-        {/* =================================================
-            HEADER
-        ================================================= */}
+        {guidedMode && (
+          <aside className="astrology-welcome-art" aria-label={language === "hi" ? "वैदिक ज्योतिष का दृश्य" : "Vedic astrology artwork"}>
+            <div className="astrology-welcome-art-visual" aria-hidden="true">
+              <span className="astrology-welcome-art-orbit astrology-welcome-art-orbit--one" />
+              <span className="astrology-welcome-art-orbit astrology-welcome-art-orbit--two" />
+              <span className="astrology-welcome-art-orbit astrology-welcome-art-orbit--three" />
+              <span className="astrology-welcome-art-moon" />
+              <span className="astrology-welcome-art-star astrology-welcome-art-star--one">✦</span>
+              <span className="astrology-welcome-art-star astrology-welcome-art-star--two">✧</span>
+              <span className="astrology-welcome-art-star astrology-welcome-art-star--three">✦</span>
+              <span className="astrology-welcome-art-zodiac astrology-welcome-art-zodiac--one">♊</span>
+              <span className="astrology-welcome-art-zodiac astrology-welcome-art-zodiac--two">♉</span>
+              <span className="astrology-welcome-art-zodiac astrology-welcome-art-zodiac--three">♌</span>
+              <span className="astrology-welcome-art-horizon" />
+            </div>
+            <div className="astrology-welcome-art-copy">
+              <span>{language === "hi" ? "वैदिक ज्योतिष" : "VEDIC ASTROLOGY"}</span>
+              <h3>{language === "hi" ? <>अपने ब्रह्मांडीय<br />संकेत जानें</> : <>Discover Your<br />Cosmic Insights</>}</h3>
+              <p>{language === "hi" ? "आपकी जन्म जानकारी से आपकी व्यक्तिगत ज्योतिषीय रीडिंग तैयार करने में मदद मिलती है।" : "Your birth details help us prepare a more personal astrological reading."}</p>
+            </div>
+            <div className="astrology-welcome-art-footer">
+              <span />
+              {language === "hi" ? "व्यक्तिगत मार्गदर्शन" : "PERSONAL GUIDANCE"}
+            </div>
+          </aside>
+        )}
+
+        <div className={`astrology-welcome-content ${guidedMode ? "astrology-welcome-content--guided" : ""}`}>
+          {guidedMode && (
+            <div className="astrology-welcome-guided-topbar">
+              <div className="astrology-welcome-stepper" role="group" aria-label={language === "hi" ? "प्रगति" : "Progress"}>
+                {([
+                  { number: 1 as const, en: "Birth Details", hi: "जन्म विवरण" },
+                  { number: 2 as const, en: "Your Question", hi: "आपका प्रश्न" },
+                  { number: 3 as const, en: "Review", hi: "समीक्षा" },
+                ]).map((step) => (
+                  <div
+                    key={step.number}
+                    className={`astrology-welcome-step ${activeBirthStep === step.number ? "is-active" : activeBirthStep > step.number ? "is-complete" : ""}`}
+                    aria-current={activeBirthStep === step.number ? "step" : undefined}
+                  >
+                    <span className="astrology-welcome-step-number">{activeBirthStep > step.number ? "✓" : step.number}</span>
+                    <span className="astrology-welcome-step-label">{language === "hi" ? step.hi : step.en}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="astrology-welcome-guided-actions">
+                <div className="astrology-welcome-language-control" role="group" aria-label={language === "hi" ? "भाषा चुनें" : "Choose language"}>
+                  <span className="astrology-welcome-language-label">{language === "hi" ? "भाषा" : "Language"}</span>
+                  <div className="astrology-welcome-language" role="presentation">
+                    <button type="button" className={language === "en" ? "active" : ""} aria-pressed={language === "en"} onClick={() => setLanguage("en")}>EN</button>
+                    <span aria-hidden="true">|</span>
+                    <button type="button" className={language === "hi" ? "active" : ""} aria-pressed={language === "hi"} onClick={() => setLanguage("hi")}>हिन्दी</button>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="astrology-welcome-close"
+                  aria-label={language === "hi" ? "बंद करें" : "Close"}
+                  onClick={closePopup}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* =================================================
+              HEADER
+          ================================================= */}
 
         <div className="astrology-welcome-header">
           <div>
@@ -917,18 +989,36 @@ export default function AstrologyWelcomePopup() {
               <div>
                 <h3>
                   {language === "hi"
-                    ? "जन्म विवरण"
-                    : "Birth Details"}
+                    ? birthStep === 1
+                      ? "जन्म विवरण"
+                      : birthStep === 2
+                        ? "आपका प्रश्न"
+                        : "जानकारी की समीक्षा"
+                    : birthStep === 1
+                      ? "Enter Your Birth Details"
+                      : birthStep === 2
+                        ? "What would you like to understand?"
+                        : "Review Your Details"}
                 </h3>
 
                 <p>
                   {language === "hi"
-                    ? "अपनी जन्म जानकारी भरें।"
-                    : "Enter your birth information."}
+                    ? birthStep === 1
+                      ? "अपनी जन्म जानकारी भरें।"
+                      : birthStep === 2
+                        ? "प्रश्न-क्षेत्र चुनें; अपना खास सवाल लिखना वैकल्पिक है।"
+                        : "रीडिंग तैयार करने से पहले अपनी जानकारी जाँच लें।"
+                    : birthStep === 1
+                      ? "Help us understand your unique astrology profile."
+                      : birthStep === 2
+                        ? "Choose an area and optionally add your exact question."
+                        : "Check your information before we prepare your reading."}
                 </p>
               </div>
             </div>
 
+            {birthStep === 1 && (
+              <div className="astrology-welcome-step-fields astrology-welcome-step-fields--birth">
             {/* =================================================
                 NAME
             ================================================= */}
@@ -1132,6 +1222,11 @@ export default function AstrologyWelcomePopup() {
               )}
             </div>
 
+              </div>
+            )}
+
+            {birthStep === 2 && (
+              <div className="astrology-welcome-step-fields astrology-welcome-step-fields--question">
             {/* =================================================
                 QUESTION AREA
             ================================================= */}
@@ -1219,6 +1314,43 @@ export default function AstrologyWelcomePopup() {
               </p>
             </div>
 
+              </div>
+            )}
+
+            {birthStep === 3 && (
+              <div className="astrology-welcome-step-fields astrology-welcome-step-fields--review">
+                <div className="astrology-welcome-review-card">
+                  <div className="astrology-welcome-review-heading">
+                    <span aria-hidden="true">✦</span>
+                    <div>
+                      <strong>{language === "hi" ? "जन्म विवरण" : "Birth Details"}</strong>
+                      <small>{language === "hi" ? "आपकी दी गई जानकारी" : "Information you provided"}</small>
+                    </div>
+                  </div>
+                  <div className="astrology-welcome-review-grid">
+                    <div><span>{language === "hi" ? "नाम" : "Name"}</span><strong>{name.trim() || "—"}</strong></div>
+                    <div><span>{language === "hi" ? "जन्म तिथि" : "Birth date"}</span><strong>{birthDate || "—"}</strong></div>
+                    <div><span>{language === "hi" ? "जन्म समय" : "Birth time"}</span><strong>{birthTime || (language === "hi" ? "नहीं दिया गया" : "Not provided")}</strong></div>
+                    <div><span>{language === "hi" ? "जन्म स्थान" : "Birth place"}</span><strong>{[birthCity.trim(), birthState.trim()].filter(Boolean).join(", ") || "—"}</strong></div>
+                  </div>
+                </div>
+
+                <div className="astrology-welcome-review-card astrology-welcome-review-card--question">
+                  <div className="astrology-welcome-review-heading">
+                    <span aria-hidden="true">✧</span>
+                    <div>
+                      <strong>{language === "hi" ? "आपका प्रश्न" : "Your Question"}</strong>
+                      <small>{language === "hi" ? "आपकी रीडिंग का मुख्य विषय" : "The focus of your reading"}</small>
+                    </div>
+                  </div>
+                  <div className="astrology-welcome-review-grid astrology-welcome-review-grid--single">
+                    <div><span>{language === "hi" ? "प्रश्न-क्षेत्र" : "Question area"}</span><strong>{text(QUESTION_AREAS[questionArea])}</strong></div>
+                    <div><span>{language === "hi" ? "खास सवाल" : "Specific question"}</span><strong>{exactQuestion.trim() || (language === "hi" ? "कोई खास सवाल नहीं जोड़ा गया; चुने गए क्षेत्र के आधार पर रीडिंग बनेगी।" : "No exact question added; the reading will focus on your selected area.")}</strong></div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* =================================================
                 ERROR
             ================================================= */}
@@ -1236,19 +1368,39 @@ export default function AstrologyWelcomePopup() {
                 SUBMIT
             ================================================= */}
 
-            <button
-              type="submit"
-              className="astrology-welcome-primary"
-              disabled={loading}
-            >
-              {loading
-                ? language === "hi"
-                  ? "गणना हो रही है..."
-                  : "Calculating..."
-                : language === "hi"
-                  ? "मेरी रीडिंग देखें"
-                  : "See My Reading"}
-            </button>
+            <div className="astrology-welcome-step-actions">
+              {birthStep > 1 && (
+                <button
+                  type="button"
+                  className="astrology-welcome-secondary"
+                  onClick={() => {
+                    setError("");
+                    setBirthStep((current) => (current === 3 ? 2 : 1));
+                  }}
+                  disabled={loading}
+                >
+                  {language === "hi" ? "वापस" : "Back"}
+                </button>
+              )}
+              <button
+                type="submit"
+                className="astrology-welcome-primary"
+                disabled={loading}
+              >
+                {loading
+                  ? language === "hi"
+                    ? "रीडिंग तैयार हो रही है..."
+                    : "Preparing your reading..."
+                  : birthStep < 3
+                    ? language === "hi"
+                      ? "आगे बढ़ें"
+                      : "Next"
+                    : language === "hi"
+                      ? "मेरी रीडिंग तैयार करें"
+                      : "Generate My Reading"}
+                {!loading && <span aria-hidden="true">→</span>}
+              </button>
+            </div>
           </form>
         )}
 
@@ -1262,7 +1414,10 @@ export default function AstrologyWelcomePopup() {
               <button
                 type="button"
                 className="astrology-welcome-back"
-                onClick={() => setMode("birth")}
+                onClick={() => {
+                  setBirthStep(1);
+                  setMode("birth");
+                }}
               >
                 ←{" "}
                 {language === "hi"
@@ -1741,6 +1896,7 @@ export default function AstrologyWelcomePopup() {
               </button>
             </div>
           )}
+        </div>
       </section>
     </div>
   );

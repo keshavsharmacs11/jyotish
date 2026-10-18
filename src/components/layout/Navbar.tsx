@@ -28,10 +28,6 @@ const navigation = [
     href: "/consultants",
   },
   {
-    key: "nav.shop",
-    href: "/shop",
-  },
-  {
     key: "nav.contact",
     href: "/contact",
   },
