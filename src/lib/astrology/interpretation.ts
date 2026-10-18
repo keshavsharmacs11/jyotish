@@ -118,7 +118,9 @@ function numerologyText(
   };
 }
 
-function birthWarning(birthTimeKnown: boolean): BilingualText {
+function birthWarning(
+  birthTimeKnown: boolean,
+): BilingualText {
   return birthTimeKnown
     ? {
         en:
@@ -173,59 +175,70 @@ export async function buildBirthIndication(
       en: calculation.moonRashiEn,
       hi: calculation.moonRashiHi,
     },
+
     rashiLord: {
       en: calculation.rashiLordEn,
       hi: calculation.rashiLordHi,
     },
+
     nakshatra: {
       en: calculation.nakshatraEn,
       hi: calculation.nakshatraHi,
     },
+
     nakshatraLord: {
       en: calculation.nakshatraLordEn,
       hi: calculation.nakshatraLordHi,
     },
+
     nakshatraPada: calculation.nakshatraPada,
     mulank: calculation.mulank,
     bhagyank: calculation.bhagyank,
+
     saturnRashi: {
       en: calculation.saturnRashiEn,
       hi: calculation.saturnRashiHi,
     },
+
     saturnStatus: calculation.saturnStatus,
     saturnRetrograde: calculation.saturnRetrograde,
     saturnText: saturnText(calculation.saturnStatus),
+
     area,
+
     indication: readingToIndication(personalizedReading),
     personalizedReading,
+
     numerology: numerologyText(
       calculation.mulank,
       calculation.bhagyank,
     ),
+
     luckyColor: {
       en: color[0],
       hi: color[1],
     },
+
     luckyNumber,
+
     mantra: {
       en: mantra[0],
       hi: mantra[1],
     },
+
     warning: birthWarning(
       calculation.birthTimeKnown,
     ),
   };
 }
 
-
 // =========================================================
 // LIVE DAILY GUIDANCE
 // =========================================================
 
 /**
- * The daily paragraph is intentionally NOT fixed to a Rashi.
- * It changes according to the live Moon position relative
- * to the selected Rashi and the current Saturn condition.
+ * The daily paragraph changes according to the current Moon
+ * position relative to the selected Rashi.
  */
 function dailyMoonGuidance(
   relativeMoonHouse: number,
@@ -337,31 +350,121 @@ function dailyMoonGuidance(
   }
 }
 
+// =========================================================
+// SATURN GUIDANCE RELATIVE TO THE SELECTED RASHI
+// =========================================================
 
-function addSaturnGuidance(
-  text: BilingualText,
-  saturnRashiEn: string,
-  saturnRashiHi: string,
+function dailySaturnGuidance(
+  relativeSaturnHouse: number,
   retrograde: boolean,
 ): BilingualText {
-  const guidance = retrograde
-    ? {
-        en: `Saturn is currently in ${saturnRashiEn} and is retrograde. Traditionally, this is a good time to slow down, review old matters and avoid unnecessary haste.`,
-        hi: `शनि अभी ${saturnRashiHi} राशि में वक्री चल रहे हैं। पारंपरिक ज्योतिषीय दृष्टि से इस समय पुराने मामलों की समीक्षा करना, धैर्य रखना और अनावश्यक जल्दबाज़ी से बचना उपयोगी माना जाता है।`,
-      }
-    : {
-        en: `Saturn is currently in ${saturnRashiEn}. Traditionally, this supports a patient and disciplined approach to responsibilities.`,
-        hi: `शनि अभी ${saturnRashiHi} राशि में हैं। पारंपरिक ज्योतिषीय दृष्टि से जिम्मेदारियों को धैर्य और अनुशासन के साथ संभालना उपयोगी माना जाता है।`,
-      };
+  const themes: Record<number, BilingualText> = {
+    1: {
+      en:
+        "The current Saturn position emphasizes patience with personal plans and responsibilities. Make progress steadily rather than judging yourself by immediate results.",
+      hi:
+        "शनि की वर्तमान स्थिति व्यक्तिगत योजनाओं और जिम्मेदारियों में धैर्य रखने पर जोर देती है। तुरंत परिणाम की अपेक्षा करने के बजाय लगातार प्रयास करें।",
+    },
+
+    2: {
+      en:
+        "A measured approach to spending, savings and important family conversations is the more useful theme now. Avoid commitments that depend on money you have not secured.",
+      hi:
+        "इस समय खर्च, बचत और परिवार की महत्वपूर्ण बातचीत में सोच-समझकर कदम उठाना उपयोगी रहेगा। ऐसी आर्थिक जिम्मेदारी न लें जिसके लिए धन अभी सुनिश्चित न हो।",
+    },
+
+    3: {
+      en:
+        "Consistent effort, communication and skill-building are emphasized. A small task completed properly may be more valuable than starting several things at once.",
+      hi:
+        "लगातार प्रयास, स्पष्ट बातचीत और कौशल बढ़ाने पर जोर रहेगा। एक साथ कई काम शुरू करने के बजाय किसी छोटे काम को अच्छी तरह पूरा करना अधिक उपयोगी हो सकता है।",
+    },
+
+    4: {
+      en:
+        "Home responsibilities and inner stability deserve a practical review. Set aside time for unfinished domestic or learning-related tasks instead of letting them linger.",
+      hi:
+        "घर की जिम्मेदारियों और मानसिक स्थिरता पर व्यावहारिक ध्यान देना उपयोगी रहेगा। घरेलू या पढ़ाई से जुड़े अधूरे काम टालते रहने के बजाय उनके लिए समय निकालें।",
+    },
+
+    5: {
+      en:
+        "Learning, creative work and matters of the heart benefit from maturity and consistency. Let promising ideas develop before making a large commitment.",
+      hi:
+        "सीखने, रचनात्मक काम और भावनात्मक मामलों में परिपक्वता व निरंतरता मददगार रहेगी। किसी अच्छे विचार पर बड़ी जिम्मेदारी लेने से पहले उसे विकसित होने का समय दें।",
+    },
+
+    6: {
+      en:
+        "Daily routines, service and problem-solving call for discipline. Deal with practical issues one by one and do not let a temporary setback define the whole day.",
+      hi:
+        "दिनचर्या, जिम्मेदारी और समस्याओं को सुलझाने में अनुशासन उपयोगी रहेगा। व्यावहारिक समस्याओं को एक-एक करके संभालें और किसी अस्थायी रुकावट को पूरे दिन पर हावी न होने दें।",
+    },
+
+    7: {
+      en:
+        "Partnerships and agreements call for clear expectations and dependable follow-through. A calm, specific conversation is more useful than assuming the other person understands your position.",
+      hi:
+        "साझेदारी और समझौतों में स्पष्ट अपेक्षाएँ तथा निभाए गए वादे महत्वपूर्ण रहेंगे। सामने वाला आपकी बात समझ गया होगा, ऐसा मानने के बजाय शांत और स्पष्ट बातचीत करें।",
+    },
+
+    8: {
+      en:
+        "Shared duties and complicated matters may need a slower, more thorough review. Check details before agreeing to financial or long-term obligations.",
+      hi:
+        "साझा जिम्मेदारियों और जटिल मामलों की धीरे-धीरे और ध्यान से समीक्षा करना उपयोगी रहेगा। आर्थिक या लंबे समय की जिम्मेदारी स्वीकार करने से पहले विवरण जाँचें।",
+    },
+
+    9: {
+      en:
+        "Study, guidance and long-term beliefs benefit from careful examination. Verify advice and keep plans realistic, especially when they involve a major change or journey.",
+      hi:
+        "पढ़ाई, मार्गदर्शन और लंबे समय की मान्यताओं पर सोच-समझकर विचार करना उपयोगी रहेगा। विशेषकर बड़े बदलाव या यात्रा से जुड़ी योजना में सलाह की पुष्टि करें और यथार्थवादी रहें।",
+    },
+
+    10: {
+      en:
+        "Professional responsibilities and reputation are the central themes. Focus on reliable work, clear priorities and the steps that build lasting credibility rather than chasing instant recognition.",
+      hi:
+        "काम की जिम्मेदारियाँ और प्रतिष्ठा प्रमुख विषय रहेंगे। तुरंत पहचान पाने के बजाय भरोसेमंद काम, स्पष्ट प्राथमिकताओं और दीर्घकालीन विश्वसनीयता बनाने वाले कदमों पर ध्यान दें।",
+    },
+
+    11: {
+      en:
+        "Long-term goals, networks and shared ambitions need realistic planning. Review which commitments genuinely support your goals before spreading your time too thin.",
+      hi:
+        "लंबे समय के लक्ष्य, संपर्क और साझा महत्वाकांक्षाओं के लिए व्यावहारिक योजना जरूरी रहेगी। समय बहुत अधिक बाँटने से पहले देखें कि कौन-सी जिम्मेदारियाँ वास्तव में आपके लक्ष्यों को सहारा देती हैं।",
+    },
+
+    12: {
+      en:
+        "Rest, private matters and expenses benefit from sensible limits. Protect time for recovery and review recurring costs instead of ignoring small drains on your energy or budget.",
+      hi:
+        "आराम, निजी मामलों और खर्चों में उचित सीमाएँ रखना उपयोगी रहेगा। स्वयं को तरोताज़ा होने का समय दें और ऊर्जा या बजट पर पड़ने वाले छोटे-छोटे बोझ की समीक्षा करें।",
+    },
+  };
+
+  const base = themes[relativeSaturnHouse] ?? themes[1];
+
+  if (!retrograde) {
+    return base;
+  }
 
   return {
-    en: `${text.en} ${guidance.en}`,
-    hi: `${text.hi} ${guidance.hi}`,
+    en:
+      `${base.en} With Saturn retrograde, traditional practice also favors reviewing an existing plan or responsibility before pushing ahead.`,
+    hi:
+      `${base.hi} शनि की वक्री स्थिति में पारंपरिक दृष्टि से आगे बढ़ने से पहले किसी मौजूदा योजना या जिम्मेदारी की समीक्षा करना भी उपयोगी माना जाता है।`,
   };
 }
 
+// =========================================================
+// DAILY WARNING
+// =========================================================
 
-function buildDailyWarning(relativeMoonHouse: number): BilingualText | null {
+function buildDailyWarning(
+  relativeMoonHouse: number,
+): BilingualText | null {
   if (
     relativeMoonHouse !== 6 &&
     relativeMoonHouse !== 8 &&
@@ -377,23 +480,24 @@ function buildDailyWarning(relativeMoonHouse: number): BilingualText | null {
       hi:
         "आज काम, दिनचर्या और स्वास्थ्य के मामलों में थोड़ा अतिरिक्त धैर्य रखना उपयोगी रहेगा। छोटी परेशानियों को अधिक सोचने या जल्दबाज़ी से बड़ा न बनने दें।",
     },
+
     8: {
       en:
         "Today may feel more sensitive than usual. Avoid unnecessary risks and give important decisions extra time. Take care of your routine and rest.",
       hi:
         "आज का दिन सामान्य से थोड़ा अधिक संवेदनशील महसूस हो सकता है। अनावश्यक जोखिम से बचें और महत्वपूर्ण फैसलों के लिए थोड़ा अतिरिक्त समय लें। अपनी दिनचर्या और आराम का ध्यान रखें।",
     },
+
     12: {
       en:
         "Today is better handled with patience and a slower pace. Avoid unnecessary expenses, rushed decisions and situations that drain your energy.",
       hi:
-        "आज धैर्य और थोड़ी धीमी गति से चलना बेहतर रहेगा। अनावश्यक खर्च, जल्दबाज़ी के फैसले और ऐसी परिस्थितियों से बचें जो आपकी ऊर्जा कम कर सकती हैं।",
+        "आज धैर्य और थोड़ी धीमी गति से चलना बेहतर रहेगा। अनावश्यक खर्च, जल्दबाज़ी के फैसलों और ऐसी परिस्थितियों से बचें जो आपकी ऊर्जा कम कर सकती हैं।",
     },
   };
 
   return houseText[relativeMoonHouse];
 }
-
 
 // =========================================================
 // DAILY RASHIFAL
@@ -418,24 +522,35 @@ export function buildDailyRashifal(
   }
 
   /**
-   * Live Moon position relative to the selected Rashi.
-   *
-   * This is one of the main inputs that makes the daily
-   * guidance change as the Moon moves through the zodiac.
+   * Calculate the current Moon position relative to the selected Rashi.
    */
   const relativeMoonHouse =
     ((sky.moonRashiIndex - rashiIndex + 12) % 12) + 1;
 
-  const moonGuidance = dailyMoonGuidance(relativeMoonHouse);
+  const moonGuidance =
+    dailyMoonGuidance(relativeMoonHouse);
 
-  const dailyText = addSaturnGuidance(
-    moonGuidance,
-    sky.saturnRashiEn,
-    sky.saturnRashiHi,
-    sky.saturnRetrograde,
-  );
+  /**
+   * Calculate Saturn's position relative to the selected Rashi.
+   * Combining both relative positions gives each Rashi a more
+   * differentiated daily reading.
+   */
+  const relativeSaturnHouse =
+    ((sky.saturnRashiIndex - rashiIndex + 12) % 12) + 1;
 
-  const warning = buildDailyWarning(relativeMoonHouse);
+  const saturnGuidance =
+    dailySaturnGuidance(
+      relativeSaturnHouse,
+      sky.saturnRetrograde,
+    );
+
+  const dailyText: BilingualText = {
+    en: `${moonGuidance.en} ${saturnGuidance.en}`,
+    hi: `${moonGuidance.hi} ${saturnGuidance.hi}`,
+  };
+
+  const warning =
+    buildDailyWarning(relativeMoonHouse);
 
   return {
     rashi: {
